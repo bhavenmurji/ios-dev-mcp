@@ -217,6 +217,14 @@ const TOOLS: Tool[] = [
           type: "string",
           description: "Xcode scheme",
         },
+        sdk: {
+          type: "string",
+          description: "SDK to get settings for (e.g., iphonesimulator, iphoneos). Important: affects BUILT_PRODUCTS_DIR path",
+        },
+        destination: {
+          type: "string",
+          description: "Build destination (e.g., 'platform=iOS Simulator,name=iPhone 15')",
+        },
       },
       required: ["projectPath", "scheme"],
     },
@@ -1484,8 +1492,13 @@ class IOSDevServer {
   private async handleXcodeGetBuildSettings(args: Record<string, unknown>) {
     const projectPath = args.projectPath as string;
     const scheme = args.scheme as string;
+    const sdk = args.sdk as string | undefined;
+    const destination = args.destination as string | undefined;
 
-    const result = await getBuildSettings(projectPath, scheme);
+    const result = await getBuildSettings(projectPath, scheme, {
+      sdk,
+      destination,
+    });
 
     if (!result.success) {
       return {
