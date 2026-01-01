@@ -295,6 +295,21 @@ export async function uninstallApp(
 }
 
 /**
+ * Check if an app is installed on the simulator
+ */
+export async function isAppInstalled(
+  udid: string,
+  bundleId: string
+): Promise<boolean> {
+  const result = await executeCommand(
+    "xcrun",
+    ["simctl", "get_app_container", udid, bundleId],
+    { timeout: 10000 }
+  );
+  return result.exitCode === 0;
+}
+
+/**
  * Launch an app on a simulator
  */
 export async function launchApp(
@@ -302,6 +317,21 @@ export async function launchApp(
   bundleId: string,
   args?: string[]
 ): Promise<AppLaunchResult> {
+  // First check if the app is installed
+  const installed = await isAppInstalled(udid, bundleId);
+  if (!installed) {
+    return {
+      success: false,
+      message: "",
+      error:
+        `App "${bundleId}" is not installed on this simulator.\n` +
+        "Possible solutions:\n" +
+        "1. Use dev_run to build, install, and launch the app\n" +
+        "2. Check that the bundle ID is correct\n" +
+        "3. Install the app first using simulator_install_app",
+    };
+  }
+
   const launchArgs = ["simctl", "launch", udid, bundleId];
   if (args && args.length > 0) {
     launchArgs.push(...args);
@@ -310,10 +340,24 @@ export async function launchApp(
   const result = await executeCommand("xcrun", launchArgs, { timeout: 30000 });
 
   if (result.exitCode !== 0) {
+    // Provide more specific error messages based on error type
+    const errorMsg = result.stderr || "";
+
+    if (errorMsg.includes("FBSOpenApplicationServiceErrorDomain") && errorMsg.includes("code=4")) {
+      return {
+        success: false,
+        message: "",
+        error:
+          `Failed to launch "${bundleId}": The app binary could not be found.\n` +
+          "This usually means the app was installed but the executable is missing.\n" +
+          "Try reinstalling the app using dev_run or simulator_install_app.",
+      };
+    }
+
     return {
       success: false,
       message: "",
-      error: result.stderr || `Failed to launch app`,
+      error: errorMsg || `Failed to launch app`,
     };
   }
 

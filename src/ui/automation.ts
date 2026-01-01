@@ -34,6 +34,41 @@ async function focusSimulator(): Promise<boolean> {
 }
 
 /**
+ * Get Simulator window position and size
+ */
+async function getSimulatorWindowBounds(): Promise<{
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+} | null> {
+  const script = `
+    tell application "System Events"
+      tell process "Simulator"
+        if (count of windows) > 0 then
+          set frontWindow to window 1
+          set winPos to position of frontWindow
+          set winSize to size of frontWindow
+          return (item 1 of winPos) & "," & (item 2 of winPos) & "," & (item 1 of winSize) & "," & (item 2 of winSize)
+        end if
+      end tell
+    end tell
+  `;
+
+  const result = await executeCommand("osascript", ["-e", script], { timeout: 5000 });
+  if (result.exitCode !== 0 || !result.stdout.trim()) {
+    return null;
+  }
+
+  const parts = result.stdout.trim().split(",").map(Number);
+  if (parts.length !== 4 || parts.some(isNaN)) {
+    return null;
+  }
+
+  return { x: parts[0], y: parts[1], width: parts[2], height: parts[3] };
+}
+
+/**
  * Tap at specific coordinates on the simulator screen
  */
 export async function tap(
@@ -47,15 +82,26 @@ export async function tap(
   // Small delay to ensure focus
   await new Promise(resolve => setTimeout(resolve, 200));
 
-  // Use AppleScript to click at coordinates
-  // Note: Coordinates are relative to the Simulator window
+  // Get window position to calculate absolute screen coordinates
+  const windowBounds = await getSimulatorWindowBounds();
+  if (!windowBounds) {
+    return {
+      success: false,
+      message: "",
+      error: "Could not get Simulator window position. Ensure Simulator is open.",
+    };
+  }
+
+  // Calculate absolute screen position
+  // Add offset for the window title bar (approximately 28 pixels on macOS)
+  const titleBarHeight = 28;
+  const absX = windowBounds.x + x;
+  const absY = windowBounds.y + titleBarHeight + y;
+
+  // Use AppleScript to click at absolute screen coordinates
   const script = `
     tell application "System Events"
-      tell process "Simulator"
-        set frontWindow to window 1
-        -- Click at position relative to window
-        click at {${x}, ${y}}
-      end tell
+      click at {${absX}, ${absY}}
     end tell
   `;
 
@@ -63,7 +109,7 @@ export async function tap(
 
   if (result.exitCode !== 0) {
     // Fallback: try using cliclick if available (common macOS utility)
-    const cliclickResult = await executeCommand("cliclick", [`c:${x},${y}`], { timeout: 5000 });
+    const cliclickResult = await executeCommand("cliclick", [`c:${absX},${absY}`], { timeout: 5000 });
 
     if (cliclickResult.exitCode !== 0) {
       return {
@@ -92,29 +138,27 @@ export async function swipe(
   await focusSimulator();
   await new Promise(resolve => setTimeout(resolve, 200));
 
-  // Use AppleScript for drag operation
-  const script = `
-    tell application "System Events"
-      tell process "Simulator"
-        -- Perform drag from start to end
-        set startPoint to {${from.x}, ${from.y}}
-        set endPoint to {${to.x}, ${to.y}}
+  // Get window position to calculate absolute screen coordinates
+  const windowBounds = await getSimulatorWindowBounds();
+  if (!windowBounds) {
+    return {
+      success: false,
+      message: "",
+      error: "Could not get Simulator window position. Ensure Simulator is open.",
+    };
+  }
 
-        -- Mouse down at start
-        click at startPoint
-        delay 0.1
+  // Calculate absolute screen positions
+  const titleBarHeight = 28;
+  const absFromX = windowBounds.x + from.x;
+  const absFromY = windowBounds.y + titleBarHeight + from.y;
+  const absToX = windowBounds.x + to.x;
+  const absToY = windowBounds.y + titleBarHeight + to.y;
 
-        -- This is a simplified swipe - for more complex gestures,
-        -- we'd need to use CGEvent APIs
-      end tell
-    end tell
-  `;
-
-  // For actual swipe, we use a shell command with cliclick if available
-  // or fall back to simulating key-based scrolling
+  // For actual swipe, we use cliclick if available
   const cliclickResult = await executeCommand(
     "cliclick",
-    [`dd:${from.x},${from.y}`, `du:${to.x},${to.y}`],
+    [`dd:${absFromX},${absFromY}`, `du:${absToX},${absToY}`],
     { timeout: 5000 }
   );
 
@@ -427,10 +471,25 @@ export async function longPress(
   await focusSimulator();
   await new Promise(resolve => setTimeout(resolve, 200));
 
+  // Get window position to calculate absolute screen coordinates
+  const windowBounds = await getSimulatorWindowBounds();
+  if (!windowBounds) {
+    return {
+      success: false,
+      message: "",
+      error: "Could not get Simulator window position. Ensure Simulator is open.",
+    };
+  }
+
+  // Calculate absolute screen position
+  const titleBarHeight = 28;
+  const absX = windowBounds.x + x;
+  const absY = windowBounds.y + titleBarHeight + y;
+
   // Use cliclick for long press if available
   const result = await executeCommand(
     "cliclick",
-    [`kd:${x},${y}`, `w:${duration}`, `ku:${x},${y}`],
+    [`kd:${absX},${absY}`, `w:${duration}`, `ku:${absX},${absY}`],
     { timeout: duration + 5000 }
   );
 
@@ -456,10 +515,25 @@ export async function doubleTap(
   await focusSimulator();
   await new Promise(resolve => setTimeout(resolve, 200));
 
+  // Get window position to calculate absolute screen coordinates
+  const windowBounds = await getSimulatorWindowBounds();
+  if (!windowBounds) {
+    return {
+      success: false,
+      message: "",
+      error: "Could not get Simulator window position. Ensure Simulator is open.",
+    };
+  }
+
+  // Calculate absolute screen position
+  const titleBarHeight = 28;
+  const absX = windowBounds.x + x;
+  const absY = windowBounds.y + titleBarHeight + y;
+
   // Use cliclick for double click if available
   const result = await executeCommand(
     "cliclick",
-    [`dc:${x},${y}`],
+    [`dc:${absX},${absY}`],
     { timeout: 5000 }
   );
 
