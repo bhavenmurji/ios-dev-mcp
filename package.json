@@ -9,7 +9,7 @@
     "watch": "tsc --watch",
     "start": "node build/index.js",
     "dev": "tsc --watch & node --watch build/index.js",
-    "test": "jest",
+    "test": "NODE_OPTIONS='--experimental-vm-modules' jest",
     "lint": "eslint src/**/*.ts",
     "prepare": "npm run build"
   },
