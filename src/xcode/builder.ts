@@ -274,7 +274,11 @@ export async function build(
  */
 export async function getBuildSettings(
   projectPath: string,
-  scheme: string
+  scheme: string,
+  options?: {
+    sdk?: string;
+    destination?: string;
+  }
 ): Promise<{ success: boolean; settings: XcodeBuildSettings; error?: string }> {
   const projectType = await detectProjectType(projectPath);
 
@@ -294,7 +298,19 @@ export async function getBuildSettings(
     args.push("-project", projectPath);
   }
 
-  args.push("-scheme", scheme, "-showBuildSettings");
+  args.push("-scheme", scheme);
+
+  // Add SDK if specified (important for getting correct BUILT_PRODUCTS_DIR)
+  if (options?.sdk) {
+    args.push("-sdk", options.sdk);
+  }
+
+  // Add destination if specified
+  if (options?.destination) {
+    args.push("-destination", options.destination);
+  }
+
+  args.push("-showBuildSettings");
 
   const result = await executeCommand("xcodebuild", args, { timeout: 30000 });
 

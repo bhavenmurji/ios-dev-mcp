@@ -156,7 +156,10 @@ export async function startSession(options: {
     });
 
     // Step 3: Get build settings to find bundle ID
-    const settingsResult = await getBuildSettings(options.projectPath, scheme);
+    // Pass iphonesimulator SDK to get correct BUILT_PRODUCTS_DIR path
+    const settingsResult = await getBuildSettings(options.projectPath, scheme, {
+      sdk: "iphonesimulator",
+    });
     let bundleId = "unknown";
     let builtProductsDir = "";
 
@@ -332,14 +335,19 @@ export async function devRun(options?: {
     });
 
     // Update built products dir from build settings
-    const settingsResult = await getBuildSettings(
+    // Pass iphonesimulator SDK to get correct path for simulator builds
+    const postBuildSettings = await getBuildSettings(
       session.projectPath,
-      session.scheme
+      session.scheme,
+      {
+        sdk: "iphonesimulator",
+        destination: `platform=iOS Simulator,id=${session.simulator.udid}`,
+      }
     );
-    if (settingsResult.success) {
-      session.builtProductsDir = settingsResult.settings["BUILT_PRODUCTS_DIR"];
+    if (postBuildSettings.success) {
+      session.builtProductsDir = postBuildSettings.settings["BUILT_PRODUCTS_DIR"];
       session.bundleId =
-        settingsResult.settings["PRODUCT_BUNDLE_IDENTIFIER"] || session.bundleId;
+        postBuildSettings.settings["PRODUCT_BUNDLE_IDENTIFIER"] || session.bundleId;
     }
 
     // Step 2: Find the .app bundle
