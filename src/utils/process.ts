@@ -15,6 +15,7 @@ export interface ProcessOptions {
   cwd?: string;
   timeout?: number; // in milliseconds
   env?: Record<string, string>;
+  input?: string; // stdin input to write to the process
 }
 
 /**
@@ -25,7 +26,7 @@ export async function executeCommand(
   args: string[],
   options: ProcessOptions = {}
 ): Promise<ProcessResult> {
-  const { cwd, timeout = 30000, env } = options;
+  const { cwd, timeout = 30000, env, input } = options;
 
   return new Promise((resolve) => {
     const spawnOptions: SpawnOptions = {
@@ -72,6 +73,12 @@ export async function executeCommand(
         timedOut: false,
       });
     });
+
+    // Write input to stdin if provided
+    if (input && proc.stdin) {
+      proc.stdin.write(input);
+      proc.stdin.end();
+    }
   });
 }
 
