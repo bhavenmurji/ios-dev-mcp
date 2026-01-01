@@ -1,7 +1,7 @@
 {
   "name": "ios-dev-mcp",
   "version": "0.1.0",
-  "description": "Unified MCP server for iOS development - Swift execution, Xcode building, simulator control, and testing",
+  "description": "The complete iOS development MCP for Claude — 53 tools for Swift execution, Xcode builds, simulator control, UI automation, testing, web-to-iOS conversion, and iterative development workflows",
   "main": "build/index.js",
   "type": "module",
   "scripts": {
@@ -15,14 +15,23 @@
   },
   "keywords": [
     "mcp",
+    "model-context-protocol",
     "ios",
+    "ios-development",
     "xcode",
     "swift",
+    "swiftui",
     "simulator",
+    "xctest",
     "testing",
-    "development",
+    "ui-automation",
     "claude",
-    "ai"
+    "anthropic",
+    "ai",
+    "ai-tools",
+    "development-tools",
+    "devtools",
+    "mobile-development"
   ],
   "author": "Bhaven Murji",
   "license": "MIT",

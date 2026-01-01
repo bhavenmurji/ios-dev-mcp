@@ -1,216 +1,286 @@
 # Contributing to iOS Development MCP
 
-Thank you for your interest in contributing! This project aims to create the best-in-class MCP server for iOS development.
+Thank you for your interest in contributing! This project provides the most comprehensive MCP server for iOS development, with 53 tools covering everything from Swift execution to web-to-iOS conversion.
 
-## 🎯 Project Goals
+## Project Goals
 
-1. **Unified Experience** - Single tool for entire iOS development workflow
-2. **Performance** - Fast, efficient, minimal overhead
-3. **Reliability** - Production-ready, well-tested
-4. **Extensibility** - Easy to add new features and capabilities
+1. **Unified Experience** — Single MCP server for the entire iOS development workflow
+2. **Comprehensive Coverage** — Swift, Xcode, Simulator, UI, Testing, Web integration
+3. **Performance** — Fast, efficient, minimal overhead
+4. **Reliability** — Production-ready, well-tested
+5. **Extensibility** — Easy to add new tools and capabilities
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
+
 - macOS 13.0+
 - Xcode 15.0+
 - Node.js 18+
 - Swift 5.9+
 
 ### Setup
+
 ```bash
-git clone https://github.com/yourusername/ios-dev-mcp.git
+git clone https://github.com/bhavenmurji/ios-dev-mcp.git
 cd ios-dev-mcp
 npm install
 npm run build
 ```
 
 ### Running Tests
+
 ```bash
 npm test
 ```
 
 ### Development Mode
+
 ```bash
 npm run dev
 ```
 
-## 📝 Contribution Guidelines
-
-### Code Style
-- Use TypeScript for MCP server code
-- Use Swift for execution engine where appropriate
-- Follow existing code patterns
-- Add JSDoc comments for public APIs
-- Keep functions focused and testable
-
-### Commit Messages
-Follow conventional commits:
-- `feat:` New feature
-- `fix:` Bug fix
-- `docs:` Documentation changes
-- `test:` Test additions/changes
-- `refactor:` Code refactoring
-- `perf:` Performance improvements
-
-Example: `feat: add UI element detection for simulator`
-
-### Pull Request Process
-
-1. **Fork & Branch**
-   - Fork the repo
-   - Create feature branch from `main`
-   - Use descriptive branch names: `feature/ui-automation` or `fix/simulator-crash`
-
-2. **Develop & Test**
-   - Write tests for new features
-   - Ensure all tests pass
-   - Update documentation
-
-3. **Submit PR**
-   - Fill out PR template completely
-   - Link related issues
-   - Request review from maintainers
-
-4. **Code Review**
-   - Address feedback promptly
-   - Keep discussions professional and constructive
-   - Be open to suggestions
-
-## 🏗️ Architecture
+## Architecture
 
 ### Module Organization
+
 ```
 src/
-├── swift/          # Swift code execution
-├── xcode/          # Xcode build tools
-├── simulator/      # iOS Simulator control
-├── device/         # Real device support
-└── utils/          # Shared utilities
+├── index.ts              # MCP server entry + 53 tool definitions
+├── swift/
+│   └── executor.ts       # Swift code execution and compilation
+├── xcode/
+│   ├── builder.ts        # Xcode building, schemes, settings
+│   └── testing.ts        # XCTest execution, coverage
+├── simulator/
+│   ├── controller.ts     # Simulator lifecycle management
+│   └── advanced.ts       # Video, push, network, location, biometrics
+├── ui/
+│   ├── automation.ts     # Tap, swipe, type, gestures, buttons
+│   └── accessibility.ts  # Element inspection and screen description
+├── workflow/
+│   └── dev.ts            # Iterative development sessions
+├── context/
+│   └── claude-md.ts      # CLAUDE.md project context generation
+├── diagnostics/
+│   └── error-fixer.ts    # Smart error analysis and tracking
+├── web/
+│   └── browser.ts        # Web fetching and iOS conversion
+└── utils/
+    ├── process.ts        # Command execution utilities
+    └── tempfile.ts       # Temporary file management
 ```
 
-### Adding New Tools
+### Tool Categories (53 Total)
 
-1. Define tool schema in `src/index.ts`
-2. Implement handler function
-3. Create module in appropriate directory
-4. Add tests
-5. Update README with examples
+| Category | Tools | Location |
+|----------|-------|----------|
+| Iterative Development | 6 | `workflow/dev.ts` |
+| Swift Execution | 1 | `swift/executor.ts` |
+| Xcode Building | 3 | `xcode/builder.ts` |
+| Simulator Control | 9 | `simulator/controller.ts` |
+| Advanced Simulator | 8 | `simulator/advanced.ts` |
+| UI Automation | 11 | `ui/automation.ts` |
+| Accessibility | 2 | `ui/accessibility.ts` |
+| XCTest Integration | 3 | `xcode/testing.ts` |
+| Web Integration | 6 | `web/browser.ts` |
+| Project Context | 1 | `context/claude-md.ts` |
+| Error Diagnostics | 2 | `diagnostics/error-fixer.ts` |
+| System Info | 1 | `index.ts` |
 
-Example:
+## Adding New Tools
+
+### 1. Define Tool Schema
+
+In `src/index.ts`, add the tool definition:
+
 ```typescript
-// In src/index.ts
 {
   name: "my_new_tool",
-  description: "Does something awesome",
+  description: "Does something awesome for iOS development",
   inputSchema: {
     type: "object",
     properties: {
-      param: { type: "string" }
+      param: { type: "string", description: "Parameter description" }
     },
     required: ["param"]
   }
 }
 ```
 
-## 🧪 Testing
+### 2. Implement Handler
 
-### Test Requirements
-- Unit tests for all new functions
-- Integration tests for tool interactions
-- Manual testing on real projects
+Add the case in the tool handler switch:
 
-### Test Structure
 ```typescript
-describe('MyFeature', () => {
+case "my_new_tool": {
+  const result = await myNewFunction(args.param);
+  return { content: [{ type: "text", text: JSON.stringify(result) }] };
+}
+```
+
+### 3. Create Implementation
+
+Add the implementation in the appropriate module:
+
+```typescript
+// src/mymodule/feature.ts
+export async function myNewFunction(param: string): Promise<Result> {
+  // Implementation
+}
+```
+
+### 4. Add Tests
+
+```typescript
+// tests/mymodule/feature.test.ts
+describe('myNewFunction', () => {
   it('should handle normal case', () => {
-    // test implementation
-  });
-
-  it('should handle edge cases', () => {
-    // test implementation
-  });
-
-  it('should handle errors gracefully', () => {
-    // test implementation
+    // Test implementation
   });
 });
 ```
 
-## 📚 Documentation
+### 5. Update Documentation
 
-### Required Documentation
-- JSDoc for all public APIs
-- README updates for new features
-- Example usage in `/examples`
-- Update CHANGELOG.md
+- Add to README.md tool tables
+- Add example usage in examples/README.md
+- Update this file if adding a new module
 
-### Documentation Style
-- Be clear and concise
-- Include code examples
-- Explain the "why" not just the "how"
-- Keep it up to date
+## Code Style
 
-## 🤝 Community
+- Use TypeScript for all MCP server code
+- Use Swift for execution engine where appropriate
+- Follow existing code patterns
+- Add JSDoc comments for public APIs
+- Keep functions focused and testable
+- Use Zod for schema validation
 
-### Communication Channels
-- **GitHub Issues** - Bug reports and feature requests
-- **GitHub Discussions** - Questions and general discussion
-- **Pull Requests** - Code contributions
+## Commit Messages
+
+Follow conventional commits:
+
+- `feat:` New feature or tool
+- `fix:` Bug fix
+- `docs:` Documentation changes
+- `test:` Test additions/changes
+- `refactor:` Code refactoring
+- `perf:` Performance improvements
+
+Examples:
+```
+feat: add Face ID simulation to ui automation
+fix: handle simulator timeout on slow builds
+docs: add web integration examples
+```
+
+## Pull Request Process
+
+### 1. Fork & Branch
+
+- Fork the repo
+- Create feature branch from `main`
+- Use descriptive names: `feature/watch-connectivity` or `fix/simulator-crash`
+
+### 2. Develop & Test
+
+- Write tests for new features
+- Ensure all tests pass: `npm test`
+- Lint your code: `npm run lint`
+- Update documentation
+
+### 3. Submit PR
+
+- Fill out PR template completely
+- Link related issues
+- Include examples of tool usage
+- Add screenshots if UI-related
+
+### 4. Code Review
+
+- Address feedback promptly
+- Keep discussions constructive
+- Be open to suggestions
+
+## Testing
+
+### Test Requirements
+
+- Unit tests for all new functions
+- Integration tests for tool interactions
+- Manual testing on real Xcode projects
+
+### Test Structure
+
+```typescript
+describe('FeatureName', () => {
+  it('should handle normal case', () => {
+    // Test
+  });
+
+  it('should handle edge cases', () => {
+    // Test
+  });
+
+  it('should handle errors gracefully', () => {
+    // Test
+  });
+});
+```
+
+## Quick Contribution Ideas
+
+### Easy (Good First Issues)
+
+- Add examples to `/examples`
+- Improve error messages
+- Add tests for existing code
+- Fix documentation typos
+- Add JSDoc comments
+
+### Medium
+
+- Add new simulator capabilities
+- Improve test coverage
+- Add new location presets
+- Performance optimizations
+- Better error diagnostics patterns
+
+### Advanced
+
+- Real device support
+- Watch/tvOS simulator support
+- Visual regression testing
+- Performance profiling tools
+- CI/CD integrations
+
+## Community
+
+### Communication
+
+- **GitHub Issues** — Bug reports and feature requests
+- **GitHub Discussions** — Questions and general discussion
+- **Pull Requests** — Code contributions
 
 ### Code of Conduct
+
 - Be respectful and inclusive
 - Assume good intentions
 - Welcome newcomers
 - Focus on constructive feedback
 - Keep discussions professional
 
-### Getting Help
-- Check existing issues and discussions
-- Review documentation
-- Ask in GitHub Discussions
-- Tag maintainers if stuck
-
-## 🎁 Recognition
+## Recognition
 
 Contributors will be:
 - Listed in README acknowledgments
 - Credited in release notes
 - Given contributor badge on GitHub
 
-## 📋 Issue Labels
+## Thank You!
 
-- `good first issue` - Great for newcomers
-- `help wanted` - Looking for contributors
-- `bug` - Something isn't working
-- `enhancement` - New feature request
-- `documentation` - Documentation improvements
-- `performance` - Performance improvements needed
-
-## ⚡ Quick Contribution Ideas
-
-**Easy (Good First Issues)**
-- Add examples to `/examples`
-- Improve error messages
-- Add tests for existing code
-- Fix documentation typos
-
-**Medium**
-- Implement missing simulator controls
-- Add new Xcode build options
-- Improve test coverage
-- Performance optimizations
-
-**Advanced**
-- Real device support
-- Visual regression testing
-- CI/CD integrations
-- Performance profiling tools
-
-## 🙏 Thank You!
-
-Every contribution matters - from fixing typos to implementing major features. Thank you for helping build the future of iOS development with Claude!
+Every contribution matters — from fixing typos to implementing major features. Thank you for helping build the most comprehensive iOS development MCP!
 
 ---
 
-Questions? Open a [GitHub Discussion](https://github.com/yourusername/ios-dev-mcp/discussions)
+Questions? Open a [GitHub Discussion](https://github.com/bhavenmurji/ios-dev-mcp/discussions)
