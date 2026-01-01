@@ -2,35 +2,36 @@
 
 A unified Model Context Protocol (MCP) server that brings together Swift code execution, Xcode project building, iOS Simulator control, and device testing into one seamless development workflow with Claude.
 
-## 🎯 Vision
+## Features
 
-Enable Claude to be a true iOS development partner - from ideation through code, build, test, and debug - all in a single conversational flow. No more context-switching between fragmented tools.
+### Swift Code Execution
+- Execute Swift code snippets directly
+- Automatic temp file management
+- Timeout handling (configurable, default 30s)
+- Compilation and runtime error capture
 
-## ✨ Features
+### Xcode Building
+- Build projects (.xcodeproj) and workspaces (.xcworkspace)
+- List schemes, configurations, and targets
+- Get build settings
+- Parse build warnings and errors
+- Support for Debug/Release configurations
 
-### Phase 1 (MVP) - In Development
-- [ ] **Swift Code Execution** - Run Swift code snippets and experiments
-- [ ] **Xcode Project Building** - Build iOS/macOS projects  
-- [ ] **Simulator Control** - Launch, control, and screenshot iOS Simulator
-- [ ] **Basic Testing** - Run XCTest suites
+### iOS Simulator Control
+- List all available simulators and runtimes
+- Boot and shutdown simulators
+- Install and uninstall apps
+- Launch and terminate apps
+- Take screenshots
+- Open URLs (deep links)
+- Get app container paths
+- Retrieve simulator logs
 
-### Phase 2 (Planned)
-- [ ] **UI Automation** - Tap, swipe, type, and interact with UI elements
-- [ ] **Visual Testing** - Screenshot comparison and UI regression detection
-- [ ] **Real Device Support** - Deploy and test on physical iOS devices
-- [ ] **SwiftUI Previews** - Generate and control SwiftUI previews
-
-### Phase 3 (Future)
-- [ ] **Intelligent Testing** - AI-suggested test scenarios based on code analysis
-- [ ] **Performance Profiling** - Memory, CPU, and battery usage analysis
-- [ ] **Crash Analysis** - Automatic crash log parsing and debugging assistance
-- [ ] **CI/CD Integration** - Connect with GitHub Actions, Fastlane, etc.
-
-## 🚀 Quick Start
+## Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/ios-dev-mcp.git
+git clone https://github.com/bhavenmurji/ios-dev-mcp.git
 cd ios-dev-mcp
 
 # Install dependencies
@@ -38,12 +39,9 @@ npm install
 
 # Build the server
 npm run build
-
-# Run the server
-npm start
 ```
 
-### Configure with Claude Desktop
+## Configure with Claude Desktop
 
 Add to your `claude_desktop_config.json`:
 
@@ -58,97 +56,224 @@ Add to your `claude_desktop_config.json`:
 }
 ```
 
-## 📚 Usage Examples
+Replace `/path/to/ios-dev-mcp` with the actual path to your cloned repository.
 
-### Swift Code Execution
-```
-Claude: Let me run that Swift code for you...
-> let greeting = "Hello, World!"
-> print(greeting)
-Output: Hello, World!
-```
+## Available Tools
 
-### Build & Run Project
-```
-Claude: Building your iOS project...
-✓ Build succeeded
-✓ Launched on iPhone 15 Pro Simulator
-📸 Here's what your app looks like
-```
+### Swift Execution
 
-### UI Testing
+#### `swift_execute`
+Execute Swift code and return the output.
+
+**Parameters:**
+- `code` (required): Swift code to execute
+- `timeout` (optional): Execution timeout in milliseconds (default: 30000)
+
+**Example:**
 ```
-Claude: I'll test that login flow...
-✓ Tapped email field
-✓ Entered "test@example.com"
-✓ Tapped password field
-✓ Entered password
-✓ Tapped login button
-✓ Verified dashboard appeared
+swift_execute with code: "print(\"Hello, World!\")"
 ```
 
-## 🏗️ Architecture
+### Xcode Building
+
+#### `xcode_list_schemes`
+List all available schemes, configurations, and targets in an Xcode project.
+
+**Parameters:**
+- `projectPath` (required): Path to .xcodeproj or .xcworkspace
+
+#### `xcode_build`
+Build an Xcode project or workspace.
+
+**Parameters:**
+- `projectPath` (required): Path to .xcodeproj or .xcworkspace
+- `scheme` (required): Xcode scheme to build
+- `configuration` (optional): "Debug" or "Release" (default: "Debug")
+- `sdk` (optional): SDK to build for (e.g., "iphonesimulator", "iphoneos")
+- `destination` (optional): Build destination
+- `clean` (optional): Clean before building
+
+#### `xcode_get_build_settings`
+Get build settings for a project scheme.
+
+**Parameters:**
+- `projectPath` (required): Path to .xcodeproj or .xcworkspace
+- `scheme` (required): Xcode scheme
+
+### Simulator Control
+
+#### `simulator_list`
+List all available iOS simulators.
+
+**Parameters:**
+- `onlyBooted` (optional): Only return booted simulators
+- `onlyAvailable` (optional): Only return available simulators
+
+#### `simulator_boot`
+Boot an iOS simulator.
+
+**Parameters:**
+- `udid` (optional): Simulator UDID
+- `deviceName` (optional): Device name (e.g., "iPhone 15 Pro")
+- `osVersion` (optional): iOS version (e.g., "17.2")
+
+#### `simulator_shutdown`
+Shutdown an iOS simulator.
+
+**Parameters:**
+- `udid` (optional): Simulator UDID (if not provided, shuts down booted simulator)
+
+#### `simulator_install_app`
+Install an app on a simulator.
+
+**Parameters:**
+- `appPath` (required): Path to .app bundle
+- `udid` (optional): Simulator UDID (uses booted simulator if not provided)
+
+#### `simulator_uninstall_app`
+Uninstall an app from a simulator.
+
+**Parameters:**
+- `bundleId` (required): App bundle identifier
+- `udid` (optional): Simulator UDID
+
+#### `simulator_launch_app`
+Launch an app on a simulator.
+
+**Parameters:**
+- `bundleId` (required): App bundle identifier
+- `udid` (optional): Simulator UDID
+- `args` (optional): Command-line arguments to pass
+
+#### `simulator_terminate_app`
+Terminate a running app.
+
+**Parameters:**
+- `bundleId` (required): App bundle identifier
+- `udid` (optional): Simulator UDID
+
+#### `simulator_screenshot`
+Take a screenshot of a simulator.
+
+**Parameters:**
+- `outputPath` (optional): Where to save the screenshot
+- `udid` (optional): Simulator UDID
+
+#### `simulator_open_url`
+Open a URL in a simulator.
+
+**Parameters:**
+- `url` (required): URL to open (can be deep link)
+- `udid` (optional): Simulator UDID
+
+#### `simulator_get_app_container`
+Get the container path for an installed app.
+
+**Parameters:**
+- `bundleId` (required): App bundle identifier
+- `containerType` (optional): "app", "data", or "groups" (default: "app")
+- `udid` (optional): Simulator UDID
+
+#### `simulator_get_logs`
+Get recent logs from a simulator.
+
+**Parameters:**
+- `bundleId` (optional): Filter logs by app
+- `predicate` (optional): Custom log predicate
+- `udid` (optional): Simulator UDID
+
+### System Info
+
+#### `ios_dev_info`
+Get information about available iOS development tools.
+
+## Example Workflows
+
+### Run Swift Code
+```
+User: Can you run this Swift code: let numbers = [1, 2, 3, 4, 5]; print(numbers.reduce(0, +))
+
+Claude uses swift_execute to run the code and returns: 15
+```
+
+### Build and Run App
+```
+User: Build my app and run it on the simulator
+
+Claude:
+1. Uses xcode_list_schemes to find available schemes
+2. Uses xcode_build to build the project
+3. Uses simulator_list to find available simulators
+4. Uses simulator_boot to start a simulator
+5. Uses simulator_install_app to install the built app
+6. Uses simulator_launch_app to run the app
+7. Uses simulator_screenshot to capture the result
+```
+
+### Debug App Issues
+```
+User: My app is crashing, can you check the logs?
+
+Claude:
+1. Uses simulator_get_logs to retrieve recent logs
+2. Analyzes the crash logs and provides debugging suggestions
+```
+
+## Requirements
+
+- macOS 13.0+ (for Xcode and Simulator support)
+- Xcode 15.0+ with command-line tools
+- Node.js 18+
+- Swift 5.9+
+
+## Development
+
+```bash
+# Run tests
+npm test
+
+# Build in watch mode
+npm run watch
+
+# Lint code
+npm run lint
+```
+
+## Architecture
 
 ```
 ios-dev-mcp/
 ├── src/
 │   ├── index.ts              # MCP server entry point
-│   ├── swift/                # Swift execution engine
-│   ├── xcode/                # Xcode build tools
-│   ├── simulator/            # iOS Simulator control
-│   ├── device/               # Real device support
-│   └── utils/                # Shared utilities
-├── examples/                 # Example projects & workflows
-├── docs/                     # Documentation
-└── tests/                    # Test suites
+│   ├── swift/
+│   │   └── executor.ts       # Swift code execution
+│   ├── xcode/
+│   │   └── builder.ts        # Xcode build tools
+│   ├── simulator/
+│   │   └── controller.ts     # iOS Simulator control
+│   └── utils/
+│       ├── process.ts        # Command execution utilities
+│       └── tempfile.ts       # Temp file management
+├── tests/                    # Test suites
+├── examples/                 # Example usage
+└── docs/                     # Documentation
 ```
 
-## 🤝 Contributing
+## Contributing
 
-We welcome contributions! This project consolidates and extends the excellent work from:
-- [SwiftClaude](https://github.com/GeorgeLyon/SwiftClaude) - Swift code execution
-- [ios-simulator-mcp](https://github.com/joshuayoes/ios-simulator-mcp) - Simulator control
-- [XcodeBuildMCP](https://github.com/cameroncooke/XcodeBuildMCP) - Xcode building
-- [xcode-mcp-server](https://github.com/r-huijts/xcode-mcp-server) - Comprehensive Xcode tools
+Contributions are welcome! This project builds on ideas from:
+- [SwiftClaude](https://github.com/GeorgeLyon/SwiftClaude)
+- [ios-simulator-mcp](https://github.com/joshuayoes/ios-simulator-mcp)
+- [XcodeBuildMCP](https://github.com/cameroncooke/XcodeBuildMCP)
+- [xcode-mcp-server](https://github.com/r-huijts/xcode-mcp-server)
 
-### How to Contribute
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+## License
 
-## 📋 Requirements
+MIT License - see [LICENSE](LICENSE) for details.
 
-- macOS 13.0+ (for Xcode and Simulator support)
-- Xcode 15.0+
-- Node.js 18+
-- Swift 5.9+
-
-## 🗺️ Roadmap
-
-**Q1 2025**
-- ✅ Project initialization
-- [ ] MVP release (Swift execution + basic building)
-- [ ] Community feedback and iteration
-
-**Q2 2025**
-- [ ] Full UI automation support
-- [ ] Real device testing
-- [ ] Visual regression testing
-
-**Q3 2025**
-- [ ] AI-powered testing suggestions
-- [ ] Performance profiling
-- [ ] CI/CD integrations
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) for details
-
-## 🙏 Acknowledgments
+## Acknowledgments
 
 Built on the shoulders of giants. Special thanks to:
 - George Lyon (SwiftClaude)
@@ -157,13 +282,3 @@ Built on the shoulders of giants. Special thanks to:
 - R. Huijts (xcode-mcp-server)
 - The Anthropic team for MCP
 - The iOS development community
-
-## 📬 Contact
-
-- **Issues:** [GitHub Issues](https://github.com/yourusername/ios-dev-mcp/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/yourusername/ios-dev-mcp/discussions)
-- **Twitter:** [@yourusername](https://twitter.com/yourusername)
-
----
-
-**Made with ❤️ for the iOS development community**
