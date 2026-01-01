@@ -2,7 +2,27 @@
 
 A unified Model Context Protocol (MCP) server that brings together Swift code execution, Xcode project building, iOS Simulator control, and device testing into one seamless development workflow with Claude.
 
+## Iterative Development (Replit-like Experience)
+
+The standout feature of this MCP server is the **iterative development workflow** - similar to Replit's live preview. Instead of manually building, installing, and launching your app, just use:
+
+```
+1. "Start a dev session for my app at ~/MyApp/MyApp.xcodeproj"
+2. Make code changes
+3. "Rebuild and show me the result"
+4. See screenshot of your running app
+5. Repeat!
+```
+
+This combines build → install → launch → screenshot into one seamless step, giving you immediate visual feedback on your changes.
+
 ## Features
+
+### Iterative Development Workflow (NEW!)
+- **Session-based development** - Set up once, iterate quickly
+- **One-command build & run** - Build, install, launch, and screenshot automatically
+- **Quick restart** - Rapid rebuilds for small changes
+- **Live preview** - Take screenshots at any time to see current state
 
 ### Swift Code Execution
 - Execute Swift code snippets directly
@@ -58,7 +78,78 @@ Add to your `claude_desktop_config.json`:
 
 Replace `/path/to/ios-dev-mcp` with the actual path to your cloned repository.
 
+## Configure with Claude Code (CLI)
+
+```bash
+claude mcp add ios-dev --scope user \
+  --command "node" \
+  --args "/path/to/ios-dev-mcp/build/index.js"
+```
+
+Or create/edit `~/.claude.json`:
+
+```json
+{
+  "mcpServers": {
+    "ios-dev": {
+      "command": "node",
+      "args": ["/path/to/ios-dev-mcp/build/index.js"]
+    }
+  }
+}
+```
+
 ## Available Tools
+
+### Iterative Development (Recommended!)
+
+These tools provide a Replit-like experience for iOS development.
+
+#### `dev_session_start`
+Start a development session for iterative iOS development. **Start here!**
+
+**Parameters:**
+- `projectPath` (required): Path to .xcodeproj or .xcworkspace
+- `scheme` (optional): Xcode scheme (auto-detected if not specified)
+- `simulatorName` (optional): Simulator device name (e.g., 'iPhone 15 Pro')
+
+**Example:**
+```
+"Start a dev session for ~/MyApp/MyApp.xcodeproj"
+```
+
+#### `dev_run`
+Build, install, launch, and screenshot in one step. The main iteration command.
+
+**Parameters:**
+- `clean` (optional): Clean build before building
+
+**Example:**
+```
+"Build and run my app" or "dev_run"
+```
+
+#### `dev_restart`
+Quick rebuild and relaunch. Faster than dev_run for small changes.
+
+**Example:**
+```
+"Rebuild and show me the result" or "Restart the app"
+```
+
+#### `dev_preview`
+Take a screenshot without rebuilding.
+
+**Parameters:**
+- `outputPath` (optional): Custom screenshot path
+
+#### `dev_session_info`
+Show current session details (project, scheme, simulator, last build).
+
+#### `dev_session_end`
+End the current development session.
+
+---
 
 ### Swift Execution
 

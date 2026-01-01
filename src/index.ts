@@ -39,6 +39,17 @@ import {
   isSimctlAvailable,
 } from "./simulator/controller.js";
 
+// Import workflow tools
+import {
+  startSession,
+  devRun,
+  devRestart,
+  devPreview,
+  getSession,
+  getSessionInfo,
+  clearSession,
+} from "./workflow/dev.js";
+
 // Tool definitions
 const TOOLS: Tool[] = [
   // Swift execution tool
@@ -344,6 +355,89 @@ const TOOLS: Tool[] = [
     },
   },
 
+  // ==========================================
+  // WORKFLOW TOOLS - Iterative Development
+  // ==========================================
+
+  {
+    name: "dev_session_start",
+    description:
+      "Start a development session for iterative iOS development. This sets up the project, scheme, and simulator for rapid iteration. After starting a session, use dev_run to build and run, or dev_restart for quick rebuilds. RECOMMENDED: Start here before using other dev_ tools.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        projectPath: {
+          type: "string",
+          description: "Path to .xcodeproj or .xcworkspace",
+        },
+        scheme: {
+          type: "string",
+          description: "Xcode scheme to use (auto-detected if not specified)",
+        },
+        simulatorName: {
+          type: "string",
+          description: "Simulator device name (e.g., 'iPhone 15 Pro'). Uses booted simulator or auto-selects if not specified.",
+        },
+      },
+      required: ["projectPath"],
+    },
+  },
+  {
+    name: "dev_run",
+    description:
+      "Build, install, launch, and screenshot the app in one step. This is the main command for iterative development - like pressing 'Run' in Xcode but with automatic screenshots. Requires an active session (use dev_session_start first).",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        clean: {
+          type: "boolean",
+          description: "Clean build before building (default: false)",
+        },
+      },
+    },
+  },
+  {
+    name: "dev_restart",
+    description:
+      "Quick rebuild and relaunch for rapid iteration. Faster than dev_run as it skips clean build. Use after making code changes to see results immediately. Requires an active session.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+  {
+    name: "dev_preview",
+    description:
+      "Take a screenshot of the current app state without rebuilding. Useful for checking UI state or capturing specific screens. Requires an active session with a running app.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        outputPath: {
+          type: "string",
+          description: "Custom path to save the screenshot",
+        },
+      },
+    },
+  },
+  {
+    name: "dev_session_info",
+    description:
+      "Show the current development session details including project, scheme, simulator, and last build info.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+  {
+    name: "dev_session_end",
+    description:
+      "End the current development session and clear session state.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+
   // System info tools
   {
     name: "ios_dev_info",
@@ -454,6 +548,20 @@ class IOSDevServer {
         return await this.handleSimulatorGetAppContainer(args);
       case "simulator_get_logs":
         return await this.handleSimulatorGetLogs(args);
+
+      // Workflow tools
+      case "dev_session_start":
+        return await this.handleDevSessionStart(args);
+      case "dev_run":
+        return await this.handleDevRun(args);
+      case "dev_restart":
+        return await this.handleDevRestart(args);
+      case "dev_preview":
+        return await this.handleDevPreview(args);
+      case "dev_session_info":
+        return await this.handleDevSessionInfo();
+      case "dev_session_end":
+        return await this.handleDevSessionEnd();
 
       // System info
       case "ios_dev_info":
@@ -1072,6 +1180,215 @@ class IOSDevServer {
         {
           type: "text",
           text: results.join("\n"),
+        },
+      ],
+    };
+  }
+
+  // ==========================================
+  // WORKFLOW HANDLERS - Iterative Development
+  // ==========================================
+
+  private async handleDevSessionStart(args: Record<string, unknown>) {
+    const projectPath = args.projectPath as string;
+    const scheme = args.scheme as string | undefined;
+    const simulatorName = args.simulatorName as string | undefined;
+
+    const result = await startSession({
+      projectPath,
+      scheme,
+      simulatorName,
+    });
+
+    if (!result.success) {
+      const stepsOutput = result.steps
+        .map((s) => `${s.success ? "✓" : "✗"} ${s.step}: ${s.message}`)
+        .join("\n");
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Failed to start development session:\n${result.error}\n\nSteps:\n${stepsOutput}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    const stepsOutput = result.steps
+      .map((s) => `✓ ${s.step}: ${s.message}`)
+      .join("\n");
+
+    const sessionInfo = result.session
+      ? `\n\nSession Ready:\n- Project: ${result.session.scheme}\n- Bundle ID: ${result.session.bundleId}\n- Simulator: ${result.session.simulator.name}\n\nUse 'dev_run' to build and run your app!`
+      : "";
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Development session started!\n\n${stepsOutput}${sessionInfo}`,
+        },
+      ],
+    };
+  }
+
+  private async handleDevRun(args: Record<string, unknown>) {
+    const clean = args.clean as boolean | undefined;
+
+    const result = await devRun({ clean });
+
+    if (!result.success) {
+      const stepsOutput = result.steps
+        .map(
+          (s) =>
+            `${s.success ? "✓" : "✗"} ${s.step}: ${s.message}${s.duration ? ` (${(s.duration / 1000).toFixed(1)}s)` : ""}`
+        )
+        .join("\n");
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Build/Run Failed:\n${result.error}\n\nSteps:\n${stepsOutput}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    const stepsOutput = result.steps
+      .map(
+        (s) =>
+          `✓ ${s.step}: ${s.message}${s.duration ? ` (${(s.duration / 1000).toFixed(1)}s)` : ""}`
+      )
+      .join("\n");
+
+    const output = [
+      "App is running!",
+      "",
+      stepsOutput,
+      "",
+      result.buildTime
+        ? `Total build time: ${(result.buildTime / 1000).toFixed(2)}s`
+        : "",
+      result.screenshotPath ? `Screenshot: ${result.screenshotPath}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: output,
+        },
+      ],
+    };
+  }
+
+  private async handleDevRestart(args: Record<string, unknown>) {
+    const result = await devRestart();
+
+    if (!result.success) {
+      const stepsOutput = result.steps
+        .map(
+          (s) =>
+            `${s.success ? "✓" : "✗"} ${s.step}: ${s.message}${s.duration ? ` (${(s.duration / 1000).toFixed(1)}s)` : ""}`
+        )
+        .join("\n");
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Restart Failed:\n${result.error}\n\nSteps:\n${stepsOutput}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    const stepsOutput = result.steps
+      .map(
+        (s) =>
+          `✓ ${s.step}: ${s.message}${s.duration ? ` (${(s.duration / 1000).toFixed(1)}s)` : ""}`
+      )
+      .join("\n");
+
+    const output = [
+      "App restarted!",
+      "",
+      stepsOutput,
+      "",
+      result.buildTime
+        ? `Build time: ${(result.buildTime / 1000).toFixed(2)}s`
+        : "",
+      result.screenshotPath ? `Screenshot: ${result.screenshotPath}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: output,
+        },
+      ],
+    };
+  }
+
+  private async handleDevPreview(args: Record<string, unknown>) {
+    const outputPath = args.outputPath as string | undefined;
+
+    const result = await devPreview({ outputPath });
+
+    if (!result.success) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Screenshot failed: ${result.error}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Screenshot captured: ${result.path}`,
+        },
+      ],
+    };
+  }
+
+  private async handleDevSessionInfo() {
+    return {
+      content: [
+        {
+          type: "text",
+          text: getSessionInfo(),
+        },
+      ],
+    };
+  }
+
+  private async handleDevSessionEnd() {
+    const session = getSession();
+    clearSession();
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: session
+            ? `Development session ended for ${session.scheme}.`
+            : "No active session to end.",
         },
       ],
     };
