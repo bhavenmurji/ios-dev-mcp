@@ -36,6 +36,7 @@ import {
   getAppContainer,
   openUrl,
   getLogs,
+  listApps,
   isSimctlAvailable,
 } from "./simulator/controller.js";
 
@@ -436,6 +437,24 @@ const TOOLS: Tool[] = [
         udid: {
           type: "string",
           description: "Simulator UDID (if not provided, uses booted simulator)",
+        },
+      },
+    },
+  },
+  {
+    name: "simulator_list_apps",
+    description:
+      "List all installed applications on an iOS simulator. Returns bundle IDs, app names, and versions. By default only shows user-installed apps (not system apps like Safari, Settings, etc.).",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        udid: {
+          type: "string",
+          description: "Simulator UDID (if not provided, uses booted simulator)",
+        },
+        includeSystem: {
+          type: "boolean",
+          description: "Include system apps (Safari, Settings, etc.). Defaults to false.",
         },
       },
     },
@@ -1271,6 +1290,8 @@ class IOSDevServer {
         return await this.handleSimulatorGetAppContainer(args);
       case "simulator_get_logs":
         return await this.handleSimulatorGetLogs(args);
+      case "simulator_list_apps":
+        return await this.handleSimulatorListApps(args);
 
       // Workflow tools
       case "dev_session_start":
@@ -1942,6 +1963,72 @@ class IOSDevServer {
         },
       ],
       isError: !result.success,
+    };
+  }
+
+  private async handleSimulatorListApps(args: Record<string, unknown>) {
+    const includeSystem = args.includeSystem as boolean | undefined;
+    let udid = args.udid as string | undefined;
+
+    if (!udid) {
+      const booted = await getBootedSimulator();
+      if (!booted) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "No booted simulator found. Please boot a simulator first.",
+            },
+          ],
+          isError: true,
+        };
+      }
+      udid = booted.udid;
+    }
+
+    const result = await listApps(udid, { includeSystem });
+
+    if (!result.success) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Failed to list apps: ${result.error}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    const userApps = result.userApps || [];
+    const systemApps = result.systemApps || [];
+
+    let output = `Installed Apps on Simulator:\n\n`;
+
+    if (userApps.length > 0) {
+      output += `User Apps (${userApps.length}):\n`;
+      for (const app of userApps) {
+        output += `  - ${app.name} (${app.bundleId}) v${app.version}\n`;
+      }
+    } else {
+      output += `No user apps installed.\n`;
+    }
+
+    if (includeSystem && systemApps.length > 0) {
+      output += `\nSystem Apps (${systemApps.length}):\n`;
+      for (const app of systemApps) {
+        output += `  - ${app.name} (${app.bundleId})\n`;
+      }
+    }
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: output,
+        },
+      ],
+      isError: false,
     };
   }
 

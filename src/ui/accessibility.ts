@@ -3,7 +3,7 @@
  * Read UI element hierarchy for smarter UI interactions
  */
 
-import { executeCommand, executeShell } from "../utils/process.js";
+import { executeCommand } from "../utils/process.js";
 import { getBootedSimulator } from "../simulator/controller.js";
 
 export interface AccessibilityElement {
@@ -239,28 +239,25 @@ async function findElementFallback(
   tapPoint?: { x: number; y: number };
   error?: string;
 }> {
-  // Use simctl io to get UI state
-  let targetUdid = options.udid;
-  if (!targetUdid) {
-    const booted = await getBootedSimulator();
-    if (!booted) {
-      return { success: false, error: "No booted simulator found" };
-    }
-    targetUdid = booted.udid;
-  }
+  // The iOS Simulator renders apps as a single GPU view, making direct
+  // accessibility inspection impossible from the macOS side.
+  // This is a fundamental limitation of how the simulator works.
 
-  // Try using Facebook's idb or other tools if available
-  const result = await executeShell(
-    `xcrun simctl spawn "${targetUdid}" launchctl list 2>/dev/null | head -20`
-  );
+  const queryDescription = Object.entries(query)
+    .filter(([, v]) => v !== undefined)
+    .map(([k, v]) => `${k}="${v}"`)
+    .join(", ");
 
-  // Return helpful error with suggestions
   return {
     success: false,
-    error: `Element search by ${Object.keys(query).join(", ")} requires accessibility inspection. Consider:\n` +
-      `1. Use ui_tap with known coordinates\n` +
-      `2. Take a screenshot to identify element positions\n` +
-      `3. Add accessibilityIdentifier to your SwiftUI/UIKit views`,
+    error:
+      `Cannot find element with ${queryDescription}.\n\n` +
+      `The iOS Simulator doesn't expose its app's accessibility tree to macOS.\n` +
+      `This is a known limitation - the app renders as a single view.\n\n` +
+      `Instead, please use:\n` +
+      `1. simulator_screenshot - Capture the screen (Claude can analyze it)\n` +
+      `2. ui_tap with coordinates - Tap at a specific position\n\n` +
+      `Tip: Take a screenshot and describe what you're looking for.`,
   };
 }
 
@@ -300,6 +297,13 @@ export async function getInteractiveElements(options: {
 
 /**
  * Describe the current screen for Claude
+ *
+ * Note: iOS Simulator renders the app as a single GPU-accelerated view,
+ * which means the accessibility tree of the iOS app itself is not directly
+ * accessible from macOS automation APIs. This is a fundamental limitation.
+ *
+ * For reliable UI automation, use simulator_screenshot to view the screen
+ * and identify tap coordinates visually.
  */
 export async function describeScreen(options: {
   udid?: string;
@@ -309,27 +313,65 @@ export async function describeScreen(options: {
   elements?: AccessibilityElement[];
   error?: string;
 }> {
+  // First try to get the running app info for context
+  let appContext = "";
+  if (options.udid) {
+    try {
+      const { executeCommand } = await import("../utils/process.js");
+      // Try to get the frontmost app using simctl
+      const result = await executeCommand(
+        "xcrun",
+        ["simctl", "spawn", options.udid, "launchctl", "list"],
+        { timeout: 5000 }
+      );
+      if (result.exitCode === 0) {
+        // Parse running apps from launchctl output
+        const lines = result.stdout.split('\n');
+        const appProcesses = lines.filter(line =>
+          line.includes('UIKitApplication') ||
+          line.includes('com.apple.') === false && line.includes('application')
+        );
+        if (appProcesses.length > 0) {
+          appContext = `\nDetected running processes:\n${appProcesses.slice(0, 5).join('\n')}\n`;
+        }
+      }
+    } catch {
+      // Ignore errors in context gathering
+    }
+  }
+
   const interactive = await getInteractiveElements(options);
 
-  if (!interactive.success || !interactive.elements || interactive.elements.length === 0) {
+  // Check if we got Simulator window chrome elements vs actual app elements
+  const hasRealElements = interactive.elements && interactive.elements.length > 0 &&
+    interactive.elements.some(e =>
+      !e.type.includes('window') &&
+      !e.type.includes('toolbar') &&
+      !e.type.includes('AXWindow')
+    );
+
+  if (!interactive.success || !hasRealElements) {
     // Provide helpful guidance when accessibility tree is not available
     return {
       success: true,
       description:
-        "No accessibility elements detected.\n\n" +
-        "This is a known limitation of iOS Simulator automation. For UI interaction:\n" +
-        "1. Use simulator_screenshot to capture the current screen\n" +
-        "2. Identify element positions from the screenshot\n" +
-        "3. Use ui_tap with the identified coordinates\n\n" +
-        "Tip: Take a screenshot to visually inspect the UI.",
+        "iOS Simulator UI Inspection:\n\n" +
+        "The accessibility tree of the iOS app cannot be read directly from the macOS side.\n" +
+        "This is a known limitation - the iOS Simulator renders the app as a single view.\n" +
+        appContext +
+        "\nFor UI automation, please use:\n" +
+        "1. simulator_screenshot - Capture the current screen (Claude can analyze it visually)\n" +
+        "2. ui_tap - Tap at coordinates identified from the screenshot\n" +
+        "3. ui_swipe, ui_type_text - Other interaction commands\n\n" +
+        "Tip: Take a screenshot and Claude will help identify UI elements and their coordinates.",
     };
   }
 
   let description = "Current Screen Elements:\n\n";
 
-  const buttons = interactive.elements.filter((e) => e.type.toLowerCase().includes("button"));
-  const textFields = interactive.elements.filter((e) => e.type.toLowerCase().includes("text"));
-  const others = interactive.elements.filter(
+  const buttons = interactive.elements!.filter((e) => e.type.toLowerCase().includes("button"));
+  const textFields = interactive.elements!.filter((e) => e.type.toLowerCase().includes("text"));
+  const others = interactive.elements!.filter(
     (e) => !e.type.toLowerCase().includes("button") && !e.type.toLowerCase().includes("text")
   );
 

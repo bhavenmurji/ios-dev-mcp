@@ -648,6 +648,137 @@ export async function getLogs(
 }
 
 /**
+ * List installed apps on a simulator
+ */
+export interface InstalledApp {
+  bundleId: string;
+  name: string;
+  version: string;
+  path: string;
+  applicationType: "User" | "System";
+}
+
+export interface ListAppsResult {
+  success: boolean;
+  apps?: InstalledApp[];
+  userApps?: InstalledApp[];
+  systemApps?: InstalledApp[];
+  error?: string;
+}
+
+export async function listApps(
+  udid: string,
+  options: { includeSystem?: boolean } = {}
+): Promise<ListAppsResult> {
+  const { includeSystem = false } = options;
+
+  const result = await executeCommand(
+    "xcrun",
+    ["simctl", "listapps", udid],
+    { timeout: 30000 }
+  );
+
+  if (result.exitCode !== 0) {
+    return {
+      success: false,
+      error: result.stderr || `Failed to list apps`,
+    };
+  }
+
+  try {
+    // The output is in plist format, convert to JSON
+    const convertResult = await executeCommand(
+      "plutil",
+      ["-convert", "json", "-o", "-", "--", "-"],
+      { timeout: 10000, input: result.stdout }
+    );
+
+    if (convertResult.exitCode !== 0) {
+      // Fallback: try to parse the plist directly
+      return parseAppsFromPlist(result.stdout, includeSystem);
+    }
+
+    const appsData = JSON.parse(convertResult.stdout);
+    const apps: InstalledApp[] = [];
+
+    for (const [bundleId, appInfo] of Object.entries(appsData)) {
+      const info = appInfo as Record<string, unknown>;
+      const applicationType = (info.ApplicationType as string) || "User";
+
+      // Skip system apps if not requested
+      if (!includeSystem && applicationType === "System") {
+        continue;
+      }
+
+      apps.push({
+        bundleId,
+        name: (info.CFBundleDisplayName as string) ||
+              (info.CFBundleName as string) ||
+              bundleId,
+        version: (info.CFBundleShortVersionString as string) ||
+                 (info.CFBundleVersion as string) ||
+                 "Unknown",
+        path: (info.Path as string) || "",
+        applicationType: applicationType as "User" | "System",
+      });
+    }
+
+    const userApps = apps.filter(a => a.applicationType === "User");
+    const systemApps = apps.filter(a => a.applicationType === "System");
+
+    return {
+      success: true,
+      apps,
+      userApps,
+      systemApps,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: `Failed to parse apps list: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+/**
+ * Fallback parser for plist format when plutil conversion fails
+ */
+function parseAppsFromPlist(
+  plistOutput: string,
+  includeSystem: boolean
+): ListAppsResult {
+  const apps: InstalledApp[] = [];
+
+  // Simple regex-based extraction for common patterns
+  const bundleIdMatches = plistOutput.matchAll(/"([^"]+)" = \{/g);
+
+  for (const match of bundleIdMatches) {
+    const bundleId = match[1];
+    if (!bundleId || bundleId.startsWith("{")) continue;
+
+    // Try to find if it's a system app
+    const isSystem = bundleId.startsWith("com.apple.");
+
+    if (!includeSystem && isSystem) continue;
+
+    apps.push({
+      bundleId,
+      name: bundleId.split(".").pop() || bundleId,
+      version: "Unknown",
+      path: "",
+      applicationType: isSystem ? "System" : "User",
+    });
+  }
+
+  return {
+    success: true,
+    apps,
+    userApps: apps.filter(a => a.applicationType === "User"),
+    systemApps: apps.filter(a => a.applicationType === "System"),
+  };
+}
+
+/**
  * Check if simctl is available
  */
 export async function isSimctlAvailable(): Promise<boolean> {
