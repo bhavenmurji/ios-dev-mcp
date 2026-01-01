@@ -62,6 +62,30 @@ This combines build → install → launch → screenshot into one seamless step
 - Code coverage reports
 - Detailed test results with failure messages
 
+### Smart Error Diagnostics
+- Parse build errors and suggest fixes
+- Track recurring issues to prevent debugging loops
+- Common Swift/Xcode error patterns with solutions
+- Session statistics for error patterns
+
+### Video Recording
+- Record simulator interactions as video
+- Great for debugging UI flows and sharing issues
+
+### Push Notifications
+- Send test push notifications to simulator
+- Configure title, body, badge, and sound
+
+### Environment Simulation
+- Network conditioning (3G, LTE, WiFi, offline, etc.)
+- GPS location simulation with presets
+- Memory warning triggers
+- Biometric simulation (Face ID / Touch ID)
+
+### CLAUDE.md Integration
+- Auto-generate project context files
+- Helps Claude understand your project structure
+
 ## Installation
 
 ```bash
@@ -417,6 +441,112 @@ Get code coverage report after running tests with coverage enabled.
 #### `ios_dev_info`
 Get information about available iOS development tools.
 
+---
+
+### Smart Error Diagnostics
+
+#### `analyze_build_errors`
+Analyze build errors and suggest fixes. Tracks recurring issues to prevent debugging loops.
+
+**Parameters:**
+- `buildOutput` (required): The raw build output containing errors
+
+#### `get_error_stats`
+Get statistics about errors encountered in this session.
+
+---
+
+### Video Recording
+
+#### `simulator_start_recording`
+Start recording video of the simulator screen.
+
+**Parameters:**
+- `udid` (optional): Simulator UDID
+- `outputPath` (optional): Where to save the video
+
+#### `simulator_stop_recording`
+Stop the current video recording and save the file.
+
+**Parameters:**
+- `udid` (optional): Simulator UDID
+
+---
+
+### Push Notifications
+
+#### `send_push`
+Send a push notification to an app in the simulator.
+
+**Parameters:**
+- `bundleId` (required): App bundle identifier
+- `title` (required): Notification title
+- `body` (required): Notification body text
+- `badge` (optional): Badge number
+- `udid` (optional): Simulator UDID
+
+---
+
+### Environment Simulation
+
+#### `set_network_condition`
+Simulate different network conditions.
+
+**Parameters:**
+- `condition` (required): "100% Loss", "3G", "DSL", "Edge", "LTE", "Very Bad Network", "WiFi", or "reset"
+- `udid` (optional): Simulator UDID
+
+#### `set_location`
+Set the simulated GPS location.
+
+**Parameters:**
+- `latitude` (optional): Latitude coordinate
+- `longitude` (optional): Longitude coordinate
+- `preset` (optional): "apple", "london", "tokyo", "newyork", "sydney", "sanfrancisco"
+- `udid` (optional): Simulator UDID
+
+#### `trigger_memory_warning`
+Trigger a memory warning in the running app.
+
+**Parameters:**
+- `udid` (optional): Simulator UDID
+
+#### `simulate_biometric`
+Simulate Face ID or Touch ID authentication.
+
+**Parameters:**
+- `match` (required): Whether the biometric should match (true) or fail (false)
+- `udid` (optional): Simulator UDID
+
+---
+
+### CLAUDE.md Integration
+
+#### `generate_claude_md`
+Generate a CLAUDE.md context file for an iOS project.
+
+**Parameters:**
+- `projectPath` (required): Path to .xcodeproj or .xcworkspace
+- `outputPath` (optional): Where to save CLAUDE.md
+
+---
+
+### Accessibility Inspection
+
+#### `ui_describe_screen`
+Describe the current screen's interactive elements.
+
+**Parameters:**
+- `udid` (optional): Simulator UDID
+
+#### `ui_find_element`
+Find a UI element by label, identifier, or type.
+
+**Parameters:**
+- `label` (optional): Element accessibility label
+- `identifier` (optional): Element accessibility identifier
+- `type` (optional): Element type (button, textField, etc.)
+
 ## Example Workflows
 
 ### Run Swift Code
@@ -505,11 +635,17 @@ ios-dev-mcp/
 │   │   ├── builder.ts        # Xcode build tools
 │   │   └── testing.ts        # XCTest execution
 │   ├── simulator/
-│   │   └── controller.ts     # iOS Simulator control
+│   │   ├── controller.ts     # iOS Simulator control
+│   │   └── advanced.ts       # Video, push, network, biometrics
 │   ├── ui/
-│   │   └── automation.ts     # UI automation (tap, swipe, type)
+│   │   ├── automation.ts     # UI automation (tap, swipe, type)
+│   │   └── accessibility.ts  # Element inspection
 │   ├── workflow/
 │   │   └── dev.ts            # Iterative development session
+│   ├── context/
+│   │   └── claude-md.ts      # CLAUDE.md generation
+│   ├── diagnostics/
+│   │   └── error-fixer.ts    # Smart error analysis
 │   └── utils/
 │       ├── process.ts        # Command execution utilities
 │       └── tempfile.ts       # Temp file management

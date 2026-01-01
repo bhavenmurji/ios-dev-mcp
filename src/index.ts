@@ -74,6 +74,48 @@ import {
   getCoverage,
 } from "./xcode/testing.js";
 
+// Import CLAUDE.md integration
+import {
+  generateClaudeMd,
+  writeClaudeMd,
+  readClaudeMd,
+  analyzeProject,
+} from "./context/claude-md.js";
+
+// Import accessibility tools
+import {
+  getAccessibilityTree,
+  findElement,
+  getInteractiveElements,
+  describeScreen,
+} from "./ui/accessibility.js";
+
+// Import error fixer and diagnostics
+import {
+  parseBuildErrors,
+  suggestFixes,
+  analyzeErrors,
+  recordFixAttempt,
+  getSessionStats,
+  clearHistory,
+} from "./diagnostics/error-fixer.js";
+
+// Import advanced simulator features
+import {
+  startRecording,
+  stopRecording,
+  getRecordingStatus,
+  sendPushNotification,
+  sendSimplePush,
+  setNetworkCondition,
+  setStatusBar,
+  clearStatusBar,
+  setLocation,
+  setNamedLocation,
+  triggerMemoryWarning,
+  simulateBiometric,
+} from "./simulator/advanced.js";
+
 // Tool definitions
 const TOOLS: Tool[] = [
   // Swift execution tool
@@ -737,6 +779,257 @@ const TOOLS: Tool[] = [
       properties: {},
     },
   },
+
+  // ==========================================
+  // CLAUDE.MD INTEGRATION
+  // ==========================================
+
+  {
+    name: "generate_claude_md",
+    description:
+      "Generate a CLAUDE.md context file for an iOS project. This file helps Claude understand your project structure, build configuration, and common commands.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        projectPath: {
+          type: "string",
+          description: "Path to .xcodeproj or .xcworkspace",
+        },
+        outputPath: {
+          type: "string",
+          description: "Where to save CLAUDE.md (default: project directory)",
+        },
+      },
+      required: ["projectPath"],
+    },
+  },
+
+  // ==========================================
+  // ACCESSIBILITY INSPECTION
+  // ==========================================
+
+  {
+    name: "ui_describe_screen",
+    description:
+      "Describe the current screen's interactive elements (buttons, text fields, etc.). Useful for understanding what can be tapped or interacted with.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        udid: {
+          type: "string",
+          description: "Simulator UDID (optional)",
+        },
+      },
+    },
+  },
+  {
+    name: "ui_find_element",
+    description:
+      "Find a UI element by label, identifier, or type. Returns its location for tapping.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        label: {
+          type: "string",
+          description: "Element accessibility label",
+        },
+        identifier: {
+          type: "string",
+          description: "Element accessibility identifier",
+        },
+        type: {
+          type: "string",
+          description: "Element type (button, textField, etc.)",
+        },
+      },
+    },
+  },
+
+  // ==========================================
+  // BUILD ERROR DIAGNOSTICS
+  // ==========================================
+
+  {
+    name: "analyze_build_errors",
+    description:
+      "Analyze build errors and suggest fixes. Tracks recurring issues to prevent debugging loops. Use this after a build failure to get smart fix suggestions.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        buildOutput: {
+          type: "string",
+          description: "The raw build output containing errors",
+        },
+      },
+      required: ["buildOutput"],
+    },
+  },
+  {
+    name: "get_error_stats",
+    description:
+      "Get statistics about errors encountered in this session. Helps identify patterns and recurring issues.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+
+  // ==========================================
+  // VIDEO RECORDING
+  // ==========================================
+
+  {
+    name: "simulator_start_recording",
+    description:
+      "Start recording video of the simulator screen. Useful for capturing UI interactions and debugging.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        udid: {
+          type: "string",
+          description: "Simulator UDID (optional)",
+        },
+        outputPath: {
+          type: "string",
+          description: "Where to save the video (optional, defaults to temp directory)",
+        },
+      },
+    },
+  },
+  {
+    name: "simulator_stop_recording",
+    description: "Stop the current video recording and save the file.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        udid: {
+          type: "string",
+          description: "Simulator UDID (optional)",
+        },
+      },
+    },
+  },
+
+  // ==========================================
+  // PUSH NOTIFICATIONS
+  // ==========================================
+
+  {
+    name: "send_push",
+    description:
+      "Send a push notification to an app in the simulator. Great for testing notification handling.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        bundleId: {
+          type: "string",
+          description: "App bundle identifier",
+        },
+        title: {
+          type: "string",
+          description: "Notification title",
+        },
+        body: {
+          type: "string",
+          description: "Notification body text",
+        },
+        badge: {
+          type: "number",
+          description: "Badge number (optional)",
+        },
+        udid: {
+          type: "string",
+          description: "Simulator UDID (optional)",
+        },
+      },
+      required: ["bundleId", "title", "body"],
+    },
+  },
+
+  // ==========================================
+  // NETWORK & ENVIRONMENT
+  // ==========================================
+
+  {
+    name: "set_network_condition",
+    description:
+      "Simulate different network conditions (3G, LTE, WiFi, bad network, etc.). Useful for testing offline behavior and network error handling.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        condition: {
+          type: "string",
+          enum: ["100% Loss", "3G", "DSL", "Edge", "High Latency DNS", "LTE", "Very Bad Network", "WiFi", "WiFi 802.11ac", "reset"],
+          description: "Network condition to simulate",
+        },
+        udid: {
+          type: "string",
+          description: "Simulator UDID (optional)",
+        },
+      },
+      required: ["condition"],
+    },
+  },
+  {
+    name: "set_location",
+    description:
+      "Set the simulated GPS location for the simulator.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        latitude: {
+          type: "number",
+          description: "Latitude coordinate",
+        },
+        longitude: {
+          type: "number",
+          description: "Longitude coordinate",
+        },
+        preset: {
+          type: "string",
+          enum: ["apple", "london", "tokyo", "newyork", "sydney", "sanfrancisco"],
+          description: "Use a preset location instead of coordinates",
+        },
+        udid: {
+          type: "string",
+          description: "Simulator UDID (optional)",
+        },
+      },
+    },
+  },
+  {
+    name: "trigger_memory_warning",
+    description:
+      "Trigger a memory warning in the running app. Useful for testing memory handling.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        udid: {
+          type: "string",
+          description: "Simulator UDID (optional)",
+        },
+      },
+    },
+  },
+  {
+    name: "simulate_biometric",
+    description:
+      "Simulate Face ID or Touch ID authentication (match or fail).",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        match: {
+          type: "boolean",
+          description: "Whether the biometric should match (true) or fail (false)",
+        },
+        udid: {
+          type: "string",
+          description: "Simulator UDID (optional)",
+        },
+      },
+      required: ["match"],
+    },
+  },
 ];
 
 /**
@@ -885,6 +1178,42 @@ class IOSDevServer {
       // System info
       case "ios_dev_info":
         return await this.handleIOSDevInfo();
+
+      // CLAUDE.md integration
+      case "generate_claude_md":
+        return await this.handleGenerateClaudeMd(args);
+
+      // Accessibility inspection
+      case "ui_describe_screen":
+        return await this.handleUIDescribeScreen(args);
+      case "ui_find_element":
+        return await this.handleUIFindElement(args);
+
+      // Build error diagnostics
+      case "analyze_build_errors":
+        return await this.handleAnalyzeBuildErrors(args);
+      case "get_error_stats":
+        return await this.handleGetErrorStats();
+
+      // Video recording
+      case "simulator_start_recording":
+        return await this.handleStartRecording(args);
+      case "simulator_stop_recording":
+        return await this.handleStopRecording(args);
+
+      // Push notifications
+      case "send_push":
+        return await this.handleSendPush(args);
+
+      // Network & environment
+      case "set_network_condition":
+        return await this.handleSetNetworkCondition(args);
+      case "set_location":
+        return await this.handleSetLocation(args);
+      case "trigger_memory_warning":
+        return await this.handleTriggerMemoryWarning(args);
+      case "simulate_biometric":
+        return await this.handleSimulateBiometric(args);
 
       default:
         throw new Error(`Unknown tool: ${name}`);
@@ -1910,6 +2239,286 @@ class IOSDevServer {
 
     return {
       content: [{ type: "text", text: output }],
+    };
+  }
+
+  // ==========================================
+  // CLAUDE.MD INTEGRATION HANDLERS
+  // ==========================================
+
+  private async handleGenerateClaudeMd(args: Record<string, unknown>) {
+    const projectPath = args.projectPath as string;
+    const outputPath = args.outputPath as string | undefined;
+
+    const result = await writeClaudeMd({ projectPath, outputPath });
+
+    if (!result.success) {
+      return {
+        content: [{ type: "text", text: `Failed to generate CLAUDE.md: ${result.error}` }],
+        isError: true,
+      };
+    }
+
+    return {
+      content: [{ type: "text", text: `CLAUDE.md generated at: ${result.path}\n\nThis file provides context about your iOS project for Claude.` }],
+    };
+  }
+
+  // ==========================================
+  // ACCESSIBILITY HANDLERS
+  // ==========================================
+
+  private async handleUIDescribeScreen(args: Record<string, unknown>) {
+    const udid = args.udid as string | undefined;
+
+    const result = await describeScreen({ udid });
+
+    return {
+      content: [{ type: "text", text: result.description || result.error || "Unable to describe screen" }],
+      isError: !result.success,
+    };
+  }
+
+  private async handleUIFindElement(args: Record<string, unknown>) {
+    const query = {
+      label: args.label as string | undefined,
+      identifier: args.identifier as string | undefined,
+      type: args.type as string | undefined,
+    };
+
+    const result = await findElement(query);
+
+    if (!result.success) {
+      return {
+        content: [{ type: "text", text: result.error || "Element not found" }],
+        isError: true,
+      };
+    }
+
+    const output = [
+      `Element found: ${result.element?.type}`,
+      result.element?.label ? `Label: ${result.element.label}` : "",
+      result.tapPoint ? `Tap at: (${result.tapPoint.x}, ${result.tapPoint.y})` : "",
+    ].filter(Boolean).join("\n");
+
+    return {
+      content: [{ type: "text", text: output }],
+    };
+  }
+
+  // ==========================================
+  // BUILD ERROR DIAGNOSTICS HANDLERS
+  // ==========================================
+
+  private async handleAnalyzeBuildErrors(args: Record<string, unknown>) {
+    const buildOutput = args.buildOutput as string;
+
+    const errors = parseBuildErrors(buildOutput);
+
+    if (errors.length === 0) {
+      return {
+        content: [{ type: "text", text: "No errors found in build output." }],
+      };
+    }
+
+    const analysis = analyzeErrors(errors);
+
+    let output = analysis.summary + "\n\nDetailed Fixes:\n";
+
+    for (const { error, suggestions } of analysis.fixes.slice(0, 5)) {
+      output += `\n--- ${error.file}:${error.line} ---\n`;
+      output += `Error: ${error.message}\n`;
+      for (const fix of suggestions) {
+        output += `\n[${fix.confidence}] ${fix.description}\n`;
+        output += `${fix.explanation}\n`;
+      }
+    }
+
+    if (analysis.recurringIssues.length > 0) {
+      output += "\n\n⚠️ RECURRING ISSUES - Consider changing approach:\n";
+      for (const issue of analysis.recurringIssues) {
+        output += `- ${issue.errorType}: seen ${issue.count} times\n`;
+      }
+    }
+
+    return {
+      content: [{ type: "text", text: output }],
+    };
+  }
+
+  private async handleGetErrorStats() {
+    const stats = getSessionStats();
+
+    const output = [
+      "Session Error Statistics:",
+      "",
+      `Total errors encountered: ${stats.totalErrors}`,
+      `Resolved: ${stats.resolvedErrors}`,
+      `Recurring issues: ${stats.recurringErrors}`,
+      "",
+      "Top Issue Types:",
+      ...stats.topIssueTypes.map(t => `  - ${t.type}: ${t.count}`),
+    ].join("\n");
+
+    return {
+      content: [{ type: "text", text: output }],
+    };
+  }
+
+  // ==========================================
+  // VIDEO RECORDING HANDLERS
+  // ==========================================
+
+  private async handleStartRecording(args: Record<string, unknown>) {
+    const udid = args.udid as string | undefined;
+    const outputPath = args.outputPath as string | undefined;
+
+    const result = await startRecording({ udid, outputPath });
+
+    if (!result.success) {
+      return {
+        content: [{ type: "text", text: `Failed to start recording: ${result.error}` }],
+        isError: true,
+      };
+    }
+
+    return {
+      content: [{ type: "text", text: `Recording started. Output will be saved to: ${result.outputPath}\n\nUse simulator_stop_recording when done.` }],
+    };
+  }
+
+  private async handleStopRecording(args: Record<string, unknown>) {
+    const udid = args.udid as string | undefined;
+
+    const result = await stopRecording({ udid });
+
+    if (!result.success) {
+      return {
+        content: [{ type: "text", text: `Failed to stop recording: ${result.error}` }],
+        isError: true,
+      };
+    }
+
+    return {
+      content: [{ type: "text", text: `Recording saved to: ${result.outputPath}\nDuration: ${result.duration?.toFixed(1)}s` }],
+    };
+  }
+
+  // ==========================================
+  // PUSH NOTIFICATION HANDLERS
+  // ==========================================
+
+  private async handleSendPush(args: Record<string, unknown>) {
+    const bundleId = args.bundleId as string;
+    const title = args.title as string;
+    const body = args.body as string;
+    const badge = args.badge as number | undefined;
+    const udid = args.udid as string | undefined;
+
+    const result = await sendSimplePush(bundleId, title, body, { udid, badge });
+
+    if (!result.success) {
+      return {
+        content: [{ type: "text", text: `Failed to send push: ${result.error}` }],
+        isError: true,
+      };
+    }
+
+    return {
+      content: [{ type: "text", text: `Push notification sent to ${bundleId}:\n"${title}"\n${body}` }],
+    };
+  }
+
+  // ==========================================
+  // NETWORK & ENVIRONMENT HANDLERS
+  // ==========================================
+
+  private async handleSetNetworkCondition(args: Record<string, unknown>) {
+    const condition = args.condition as string;
+    const udid = args.udid as string | undefined;
+
+    const result = await setNetworkCondition(condition as any, { udid });
+
+    if (!result.success) {
+      return {
+        content: [{ type: "text", text: `Failed to set network condition: ${result.error}` }],
+        isError: true,
+      };
+    }
+
+    return {
+      content: [{ type: "text", text: condition === "reset"
+        ? "Network conditions reset to normal."
+        : `Network condition set to: ${condition}` }],
+    };
+  }
+
+  private async handleSetLocation(args: Record<string, unknown>) {
+    const latitude = args.latitude as number | undefined;
+    const longitude = args.longitude as number | undefined;
+    const preset = args.preset as string | undefined;
+    const udid = args.udid as string | undefined;
+
+    let result;
+    if (preset) {
+      result = await setNamedLocation(preset as any, { udid });
+    } else if (latitude !== undefined && longitude !== undefined) {
+      result = await setLocation(latitude, longitude, { udid });
+    } else {
+      return {
+        content: [{ type: "text", text: "Provide either latitude/longitude or a preset location." }],
+        isError: true,
+      };
+    }
+
+    if (!result.success) {
+      return {
+        content: [{ type: "text", text: `Failed to set location: ${result.error}` }],
+        isError: true,
+      };
+    }
+
+    return {
+      content: [{ type: "text", text: preset
+        ? `Location set to: ${preset}`
+        : `Location set to: ${latitude}, ${longitude}` }],
+    };
+  }
+
+  private async handleTriggerMemoryWarning(args: Record<string, unknown>) {
+    const udid = args.udid as string | undefined;
+
+    const result = await triggerMemoryWarning({ udid });
+
+    if (!result.success) {
+      return {
+        content: [{ type: "text", text: `Failed to trigger memory warning: ${result.error}` }],
+        isError: true,
+      };
+    }
+
+    return {
+      content: [{ type: "text", text: "Memory warning triggered. Check how your app handles it." }],
+    };
+  }
+
+  private async handleSimulateBiometric(args: Record<string, unknown>) {
+    const match = args.match as boolean;
+    const udid = args.udid as string | undefined;
+
+    const result = await simulateBiometric(match, { udid });
+
+    if (!result.success) {
+      return {
+        content: [{ type: "text", text: `Failed to simulate biometric: ${result.error}` }],
+        isError: true,
+      };
+    }
+
+    return {
+      content: [{ type: "text", text: match
+        ? "Biometric authentication succeeded (simulated)."
+        : "Biometric authentication failed (simulated)." }],
     };
   }
 
