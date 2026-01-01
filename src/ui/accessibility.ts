@@ -153,30 +153,24 @@ function parseAccessibilityOutput(output: string): AccessibilityElement[] {
 }
 
 /**
- * Run accessibility audit on the app
+ * Fallback when accessibility tree cannot be read
+ * Returns a failure with helpful guidance
  */
 async function getAccessibilityAudit(
   udid: string,
   bundleId?: string
 ): Promise<AccessibilityTree> {
-  // Use simctl to spawn accessibility audit tool
-  const args = ["simctl", "spawn", udid, "accessibilityinspector"];
-
-  try {
-    const result = await executeCommand("xcrun", args, { timeout: 5000 });
-
-    // If direct audit fails, try screenshot + OCR approach description
-    return {
-      success: true,
-      elements: [],
-      error: "Accessibility tree requires running app. Use ui_find_element for element search.",
-    };
-  } catch {
-    return {
-      success: false,
-      error: "Could not access accessibility tree. Ensure Accessibility Inspector is enabled.",
-    };
-  }
+  // The accessibility tree cannot be read directly from simctl
+  // This is a known limitation - recommend using screenshots instead
+  return {
+    success: false,
+    elements: [],
+    error:
+      "Cannot read accessibility tree directly. For UI automation:\n" +
+      "1. Use simulator_screenshot to view the current UI\n" +
+      "2. Use ui_tap with coordinates from the screenshot\n" +
+      "3. Add accessibilityIdentifier to SwiftUI/UIKit views for better automation",
+  };
 }
 
 /**
@@ -317,46 +311,47 @@ export async function describeScreen(options: {
 }> {
   const interactive = await getInteractiveElements(options);
 
-  if (!interactive.success) {
+  if (!interactive.success || !interactive.elements || interactive.elements.length === 0) {
+    // Provide helpful guidance when accessibility tree is not available
     return {
       success: true,
       description:
-        "Unable to read accessibility tree directly. Recommendation: Take a screenshot using simulator_screenshot to see the current UI state.",
+        "No accessibility elements detected.\n\n" +
+        "This is a known limitation of iOS Simulator automation. For UI interaction:\n" +
+        "1. Use simulator_screenshot to capture the current screen\n" +
+        "2. Identify element positions from the screenshot\n" +
+        "3. Use ui_tap with the identified coordinates\n\n" +
+        "Tip: Take a screenshot to visually inspect the UI.",
     };
   }
 
   let description = "Current Screen Elements:\n\n";
 
-  if (interactive.elements && interactive.elements.length > 0) {
-    const buttons = interactive.elements.filter((e) => e.type.toLowerCase().includes("button"));
-    const textFields = interactive.elements.filter((e) => e.type.toLowerCase().includes("text"));
-    const others = interactive.elements.filter(
-      (e) => !e.type.toLowerCase().includes("button") && !e.type.toLowerCase().includes("text")
-    );
+  const buttons = interactive.elements.filter((e) => e.type.toLowerCase().includes("button"));
+  const textFields = interactive.elements.filter((e) => e.type.toLowerCase().includes("text"));
+  const others = interactive.elements.filter(
+    (e) => !e.type.toLowerCase().includes("button") && !e.type.toLowerCase().includes("text")
+  );
 
-    if (buttons.length > 0) {
-      description += `Buttons (${buttons.length}):\n`;
-      buttons.forEach((b) => {
-        description += `  - "${b.label || "unnamed"}" at (${b.frame.x + b.frame.width / 2}, ${b.frame.y + b.frame.height / 2})\n`;
-      });
-    }
+  if (buttons.length > 0) {
+    description += `Buttons (${buttons.length}):\n`;
+    buttons.forEach((b) => {
+      description += `  - "${b.label || "unnamed"}" at (${b.frame.x + b.frame.width / 2}, ${b.frame.y + b.frame.height / 2})\n`;
+    });
+  }
 
-    if (textFields.length > 0) {
-      description += `\nText Fields (${textFields.length}):\n`;
-      textFields.forEach((t) => {
-        description += `  - "${t.label || "unnamed"}" value="${t.value || ""}" at (${t.frame.x + t.frame.width / 2}, ${t.frame.y + t.frame.height / 2})\n`;
-      });
-    }
+  if (textFields.length > 0) {
+    description += `\nText Fields (${textFields.length}):\n`;
+    textFields.forEach((t) => {
+      description += `  - "${t.label || "unnamed"}" value="${t.value || ""}" at (${t.frame.x + t.frame.width / 2}, ${t.frame.y + t.frame.height / 2})\n`;
+    });
+  }
 
-    if (others.length > 0) {
-      description += `\nOther Interactive Elements (${others.length}):\n`;
-      others.forEach((o) => {
-        description += `  - ${o.type}: "${o.label || "unnamed"}" at (${o.frame.x + o.frame.width / 2}, ${o.frame.y + o.frame.height / 2})\n`;
-      });
-    }
-  } else {
-    description += "No accessibility elements detected.\n";
-    description += "Tip: Take a screenshot to visually inspect the UI.";
+  if (others.length > 0) {
+    description += `\nOther Interactive Elements (${others.length}):\n`;
+    others.forEach((o) => {
+      description += `  - ${o.type}: "${o.label || "unnamed"}" at (${o.frame.x + o.frame.width / 2}, ${o.frame.y + o.frame.height / 2})\n`;
+    });
   }
 
   return {
