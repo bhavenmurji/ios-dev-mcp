@@ -116,6 +116,18 @@ import {
   simulateBiometric,
 } from "./simulator/advanced.js";
 
+// Import web browser integration
+import {
+  fetchWebContent,
+  downloadImage,
+  extractColors,
+  generateSwiftUIColors,
+  analyzeWebpageForUI,
+  textToSwiftUI,
+  convertWebToiOS,
+  parseWebContent,
+} from "./web/browser.js";
+
 // Tool definitions
 const TOOLS: Tool[] = [
   // Swift execution tool
@@ -1030,6 +1042,127 @@ const TOOLS: Tool[] = [
       required: ["match"],
     },
   },
+
+  // ==========================================
+  // WEB BROWSER INTEGRATION
+  // ==========================================
+
+  {
+    name: "web_fetch",
+    description:
+      "Fetch content from a URL and extract text. Useful for reading documentation, getting design inspiration, or understanding API specs.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        url: {
+          type: "string",
+          description: "URL to fetch",
+        },
+      },
+      required: ["url"],
+    },
+  },
+  {
+    name: "web_to_ios",
+    description:
+      "Convert a webpage into iOS code. Extracts content, colors, and UI patterns, then generates SwiftUI views and data models.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        url: {
+          type: "string",
+          description: "URL to analyze and convert",
+        },
+        generateView: {
+          type: "boolean",
+          description: "Generate SwiftUI view (default: true)",
+        },
+        generateModel: {
+          type: "boolean",
+          description: "Generate data model (default: true)",
+        },
+        generateColors: {
+          type: "boolean",
+          description: "Extract and generate color definitions (default: true)",
+        },
+      },
+      required: ["url"],
+    },
+  },
+  {
+    name: "web_analyze_ui",
+    description:
+      "Analyze a webpage's UI patterns and suggest iOS equivalents. Detects navigation, cards, lists, forms, grids, and provides SwiftUI code snippets.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        url: {
+          type: "string",
+          description: "URL to analyze for UI patterns",
+        },
+      },
+      required: ["url"],
+    },
+  },
+  {
+    name: "web_download_image",
+    description:
+      "Download an image from a URL for use in the iOS app. Saves to a local path that can be added to Assets.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        url: {
+          type: "string",
+          description: "Image URL to download",
+        },
+        filename: {
+          type: "string",
+          description: "Custom filename (optional)",
+        },
+      },
+      required: ["url"],
+    },
+  },
+  {
+    name: "text_to_swiftui",
+    description:
+      "Convert plain text content into a SwiftUI view. Useful for turning copied content into a presentable iOS screen.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        text: {
+          type: "string",
+          description: "Text content to convert",
+        },
+        style: {
+          type: "string",
+          enum: ["article", "list", "card", "minimal"],
+          description: "View style to generate (default: article)",
+        },
+      },
+      required: ["text"],
+    },
+  },
+  {
+    name: "web_extract_colors",
+    description:
+      "Extract color palette from a webpage and generate Swift color definitions. Great for matching website branding in your iOS app.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        url: {
+          type: "string",
+          description: "URL to extract colors from",
+        },
+        framework: {
+          type: "string",
+          enum: ["swiftui", "uikit"],
+          description: "Framework for color definitions (default: swiftui)",
+        },
+      },
+      required: ["url"],
+    },
+  },
 ];
 
 /**
@@ -1214,6 +1347,20 @@ class IOSDevServer {
         return await this.handleTriggerMemoryWarning(args);
       case "simulate_biometric":
         return await this.handleSimulateBiometric(args);
+
+      // Web browser integration
+      case "web_fetch":
+        return await this.handleWebFetch(args);
+      case "web_to_ios":
+        return await this.handleWebToiOS(args);
+      case "web_analyze_ui":
+        return await this.handleWebAnalyzeUI(args);
+      case "web_download_image":
+        return await this.handleWebDownloadImage(args);
+      case "text_to_swiftui":
+        return await this.handleTextToSwiftUI(args);
+      case "web_extract_colors":
+        return await this.handleWebExtractColors(args);
 
       default:
         throw new Error(`Unknown tool: ${name}`);
@@ -2519,6 +2666,160 @@ class IOSDevServer {
       content: [{ type: "text", text: match
         ? "Biometric authentication succeeded (simulated)."
         : "Biometric authentication failed (simulated)." }],
+    };
+  }
+
+  // ==========================================
+  // WEB BROWSER INTEGRATION HANDLERS
+  // ==========================================
+
+  private async handleWebFetch(args: Record<string, unknown>) {
+    const url = args.url as string;
+
+    const result = await fetchWebContent(url);
+
+    if (!result.success) {
+      return {
+        content: [{ type: "text", text: `Failed to fetch: ${result.error}` }],
+        isError: true,
+      };
+    }
+
+    const output = [
+      result.title ? `Title: ${result.title}` : "",
+      "",
+      result.content?.substring(0, 5000) || "(no content)",
+    ].filter(Boolean).join("\n");
+
+    return {
+      content: [{ type: "text", text: output }],
+    };
+  }
+
+  private async handleWebToiOS(args: Record<string, unknown>) {
+    const url = args.url as string;
+    const generateView = args.generateView as boolean | undefined;
+    const generateModel = args.generateModel as boolean | undefined;
+    const generateColors = args.generateColors as boolean | undefined;
+
+    const result = await convertWebToiOS(url, {
+      generateView: generateView !== false,
+      generateModel: generateModel !== false,
+      generateColors: generateColors !== false,
+    });
+
+    if (!result.success) {
+      return {
+        content: [{ type: "text", text: `Failed to convert: ${result.error}` }],
+        isError: true,
+      };
+    }
+
+    const parts = [result.summary, ""];
+
+    if (result.swiftUIView) {
+      parts.push("=== SwiftUI View ===", result.swiftUIView, "");
+    }
+    if (result.dataModel) {
+      parts.push("=== Data Model ===", result.dataModel, "");
+    }
+    if (result.colors) {
+      parts.push("=== Colors ===", result.colors);
+    }
+
+    return {
+      content: [{ type: "text", text: parts.join("\n") }],
+    };
+  }
+
+  private async handleWebAnalyzeUI(args: Record<string, unknown>) {
+    const url = args.url as string;
+
+    const result = await analyzeWebpageForUI(url);
+
+    if (!result.success) {
+      return {
+        content: [{ type: "text", text: `Failed to analyze: ${result.error}` }],
+        isError: true,
+      };
+    }
+
+    let output = result.summary + "\n\n";
+
+    if (result.patterns.length > 0) {
+      output += "=== UI Patterns & SwiftUI Code ===\n\n";
+      for (const pattern of result.patterns) {
+        output += `--- ${pattern.type.toUpperCase()} ---\n`;
+        output += `${pattern.description}\n\n`;
+        if (pattern.swiftUICode) {
+          output += "```swift\n" + pattern.swiftUICode + "\n```\n\n";
+        }
+      }
+    }
+
+    return {
+      content: [{ type: "text", text: output }],
+    };
+  }
+
+  private async handleWebDownloadImage(args: Record<string, unknown>) {
+    const url = args.url as string;
+    const filename = args.filename as string | undefined;
+
+    const result = await downloadImage(url, { filename });
+
+    if (!result.success) {
+      return {
+        content: [{ type: "text", text: `Failed to download: ${result.error}` }],
+        isError: true,
+      };
+    }
+
+    return {
+      content: [{ type: "text", text: `Image downloaded!\n\nPath: ${result.localPath}\nFilename: ${result.filename}\nSize: ${(result.size! / 1024).toFixed(1)} KB\n\nAdd this to your Xcode project's Assets.xcassets` }],
+    };
+  }
+
+  private async handleTextToSwiftUI(args: Record<string, unknown>) {
+    const text = args.text as string;
+    const style = (args.style as "article" | "list" | "card" | "minimal") || "article";
+
+    const code = textToSwiftUI(text, { style });
+
+    return {
+      content: [{ type: "text", text: `Generated SwiftUI View (${style} style):\n\n\`\`\`swift\n${code}\n\`\`\`` }],
+    };
+  }
+
+  private async handleWebExtractColors(args: Record<string, unknown>) {
+    const url = args.url as string;
+    const framework = (args.framework as "swiftui" | "uikit") || "swiftui";
+
+    const fetchResult = await fetchWebContent(url, { extractText: false });
+
+    if (!fetchResult.success) {
+      return {
+        content: [{ type: "text", text: `Failed to fetch: ${fetchResult.error}` }],
+        isError: true,
+      };
+    }
+
+    const palette = extractColors(fetchResult.content || "");
+
+    if (palette.colors.length === 0) {
+      return {
+        content: [{ type: "text", text: "No colors found on the webpage." }],
+      };
+    }
+
+    const code = framework === "swiftui"
+      ? generateSwiftUIColors(palette, "brand")
+      : `import UIKit\n\nextension UIColor {\n${palette.colors.map((c, i) =>
+          `    static let brandColor${i + 1} = UIColor(red: ${(c.rgb.r / 255).toFixed(3)}, green: ${(c.rgb.g / 255).toFixed(3)}, blue: ${(c.rgb.b / 255).toFixed(3)}, alpha: 1.0) // ${c.hex}`
+        ).join("\n")}\n}`;
+
+    return {
+      content: [{ type: "text", text: `Found ${palette.colors.length} colors:\n\n${palette.colors.map(c => c.hex).join(", ")}\n\n\`\`\`swift\n${code}\n\`\`\`` }],
     };
   }
 
