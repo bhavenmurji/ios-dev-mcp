@@ -50,6 +50,30 @@ import {
   clearSession,
 } from "./workflow/dev.js";
 
+// Import UI automation tools
+import {
+  tap,
+  swipe,
+  typeText,
+  pressKey,
+  pressButton,
+  dismissKeyboard,
+  scroll,
+  longPress,
+  doubleTap,
+  setAppearance,
+  checkUIAutomationAvailable,
+} from "./ui/automation.js";
+
+// Import testing tools
+import {
+  runTests,
+  listTests,
+  buildForTesting,
+  formatTestResults,
+  getCoverage,
+} from "./xcode/testing.js";
+
 // Tool definitions
 const TOOLS: Tool[] = [
   // Swift execution tool
@@ -438,6 +462,271 @@ const TOOLS: Tool[] = [
     },
   },
 
+  // ==========================================
+  // UI AUTOMATION TOOLS
+  // ==========================================
+
+  {
+    name: "ui_tap",
+    description:
+      "Tap at specific coordinates on the simulator screen. Coordinates are relative to the Simulator window.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        x: {
+          type: "number",
+          description: "X coordinate",
+        },
+        y: {
+          type: "number",
+          description: "Y coordinate",
+        },
+      },
+      required: ["x", "y"],
+    },
+  },
+  {
+    name: "ui_double_tap",
+    description: "Double tap at specific coordinates.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        x: {
+          type: "number",
+          description: "X coordinate",
+        },
+        y: {
+          type: "number",
+          description: "Y coordinate",
+        },
+      },
+      required: ["x", "y"],
+    },
+  },
+  {
+    name: "ui_long_press",
+    description: "Long press at specific coordinates.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        x: {
+          type: "number",
+          description: "X coordinate",
+        },
+        y: {
+          type: "number",
+          description: "Y coordinate",
+        },
+        duration: {
+          type: "number",
+          description: "Duration in milliseconds (default: 1000)",
+        },
+      },
+      required: ["x", "y"],
+    },
+  },
+  {
+    name: "ui_swipe",
+    description: "Swipe from one point to another on the simulator.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        fromX: {
+          type: "number",
+          description: "Start X coordinate",
+        },
+        fromY: {
+          type: "number",
+          description: "Start Y coordinate",
+        },
+        toX: {
+          type: "number",
+          description: "End X coordinate",
+        },
+        toY: {
+          type: "number",
+          description: "End Y coordinate",
+        },
+        duration: {
+          type: "number",
+          description: "Duration in milliseconds (default: 300)",
+        },
+      },
+      required: ["fromX", "fromY", "toX", "toY"],
+    },
+  },
+  {
+    name: "ui_type",
+    description:
+      "Type text into the currently focused text field in the simulator.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        text: {
+          type: "string",
+          description: "Text to type",
+        },
+      },
+      required: ["text"],
+    },
+  },
+  {
+    name: "ui_press_key",
+    description:
+      "Press a key or key combination (e.g., 'return', 'escape', 'tab').",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        key: {
+          type: "string",
+          description: "Key to press (e.g., 'return', 'escape', 'tab', 'delete', 'up', 'down', 'left', 'right')",
+        },
+        modifiers: {
+          type: "array",
+          items: {
+            type: "string",
+            enum: ["command", "control", "option", "shift"],
+          },
+          description: "Modifier keys to hold",
+        },
+      },
+      required: ["key"],
+    },
+  },
+  {
+    name: "ui_press_button",
+    description:
+      "Press a hardware button on the simulator (home, lock, volume, shake).",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        button: {
+          type: "string",
+          enum: ["home", "lock", "volume_up", "volume_down", "shake"],
+          description: "Hardware button to press",
+        },
+      },
+      required: ["button"],
+    },
+  },
+  {
+    name: "ui_scroll",
+    description: "Scroll in a direction.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        direction: {
+          type: "string",
+          enum: ["up", "down", "left", "right"],
+          description: "Direction to scroll",
+        },
+        amount: {
+          type: "number",
+          description: "Amount to scroll in pixels (default: 100)",
+        },
+      },
+      required: ["direction"],
+    },
+  },
+  {
+    name: "ui_dismiss_keyboard",
+    description: "Dismiss the on-screen keyboard.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+  {
+    name: "ui_set_appearance",
+    description: "Set the simulator appearance mode (light/dark).",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        mode: {
+          type: "string",
+          enum: ["light", "dark"],
+          description: "Appearance mode",
+        },
+      },
+      required: ["mode"],
+    },
+  },
+
+  // ==========================================
+  // TESTING TOOLS
+  // ==========================================
+
+  {
+    name: "xcode_test",
+    description:
+      "Run XCTest unit tests or UI tests for an Xcode project. Returns test results with pass/fail status.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        projectPath: {
+          type: "string",
+          description: "Path to .xcodeproj or .xcworkspace",
+        },
+        scheme: {
+          type: "string",
+          description: "Xcode scheme containing tests",
+        },
+        testPlan: {
+          type: "string",
+          description: "Test plan to use (optional)",
+        },
+        onlyTesting: {
+          type: "array",
+          items: { type: "string" },
+          description: "Specific tests to run (e.g., ['MyTests/testLogin'])",
+        },
+        skipTesting: {
+          type: "array",
+          items: { type: "string" },
+          description: "Tests to skip",
+        },
+      },
+      required: ["projectPath", "scheme"],
+    },
+  },
+  {
+    name: "xcode_test_list",
+    description: "List available tests in an Xcode project.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        projectPath: {
+          type: "string",
+          description: "Path to .xcodeproj or .xcworkspace",
+        },
+        scheme: {
+          type: "string",
+          description: "Xcode scheme",
+        },
+      },
+      required: ["projectPath", "scheme"],
+    },
+  },
+  {
+    name: "xcode_coverage",
+    description:
+      "Get code coverage report from the most recent test run.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        projectPath: {
+          type: "string",
+          description: "Path to .xcodeproj or .xcworkspace",
+        },
+        scheme: {
+          type: "string",
+          description: "Xcode scheme",
+        },
+      },
+      required: ["projectPath", "scheme"],
+    },
+  },
+
   // System info tools
   {
     name: "ios_dev_info",
@@ -562,6 +851,36 @@ class IOSDevServer {
         return await this.handleDevSessionInfo();
       case "dev_session_end":
         return await this.handleDevSessionEnd();
+
+      // UI Automation tools
+      case "ui_tap":
+        return await this.handleUITap(args);
+      case "ui_double_tap":
+        return await this.handleUIDoubleTap(args);
+      case "ui_long_press":
+        return await this.handleUILongPress(args);
+      case "ui_swipe":
+        return await this.handleUISwipe(args);
+      case "ui_type":
+        return await this.handleUIType(args);
+      case "ui_press_key":
+        return await this.handleUIPressKey(args);
+      case "ui_press_button":
+        return await this.handleUIPressButton(args);
+      case "ui_scroll":
+        return await this.handleUIScroll(args);
+      case "ui_dismiss_keyboard":
+        return await this.handleUIDismissKeyboard();
+      case "ui_set_appearance":
+        return await this.handleUISetAppearance(args);
+
+      // Testing tools
+      case "xcode_test":
+        return await this.handleXcodeTest(args);
+      case "xcode_test_list":
+        return await this.handleXcodeTestList(args);
+      case "xcode_coverage":
+        return await this.handleXcodeCoverage(args);
 
       // System info
       case "ios_dev_info":
@@ -1391,6 +1710,206 @@ class IOSDevServer {
             : "No active session to end.",
         },
       ],
+    };
+  }
+
+  // ==========================================
+  // UI AUTOMATION HANDLERS
+  // ==========================================
+
+  private async handleUITap(args: Record<string, unknown>) {
+    const x = args.x as number;
+    const y = args.y as number;
+
+    const result = await tap(x, y);
+
+    return {
+      content: [{ type: "text", text: result.success ? result.message : `Failed: ${result.error}` }],
+      isError: !result.success,
+    };
+  }
+
+  private async handleUIDoubleTap(args: Record<string, unknown>) {
+    const x = args.x as number;
+    const y = args.y as number;
+
+    const result = await doubleTap(x, y);
+
+    return {
+      content: [{ type: "text", text: result.success ? result.message : `Failed: ${result.error}` }],
+      isError: !result.success,
+    };
+  }
+
+  private async handleUILongPress(args: Record<string, unknown>) {
+    const x = args.x as number;
+    const y = args.y as number;
+    const duration = (args.duration as number) || 1000;
+
+    const result = await longPress(x, y, duration);
+
+    return {
+      content: [{ type: "text", text: result.success ? result.message : `Failed: ${result.error}` }],
+      isError: !result.success,
+    };
+  }
+
+  private async handleUISwipe(args: Record<string, unknown>) {
+    const fromX = args.fromX as number;
+    const fromY = args.fromY as number;
+    const toX = args.toX as number;
+    const toY = args.toY as number;
+    const duration = (args.duration as number) || 300;
+
+    const result = await swipe({ x: fromX, y: fromY }, { x: toX, y: toY }, duration);
+
+    return {
+      content: [{ type: "text", text: result.success ? result.message : `Failed: ${result.error}` }],
+      isError: !result.success,
+    };
+  }
+
+  private async handleUIType(args: Record<string, unknown>) {
+    const text = args.text as string;
+
+    const result = await typeText(text);
+
+    return {
+      content: [{ type: "text", text: result.success ? result.message : `Failed: ${result.error}` }],
+      isError: !result.success,
+    };
+  }
+
+  private async handleUIPressKey(args: Record<string, unknown>) {
+    const key = args.key as string;
+    const modifiers = args.modifiers as Array<"command" | "control" | "option" | "shift"> | undefined;
+
+    const result = await pressKey(key, modifiers);
+
+    return {
+      content: [{ type: "text", text: result.success ? result.message : `Failed: ${result.error}` }],
+      isError: !result.success,
+    };
+  }
+
+  private async handleUIPressButton(args: Record<string, unknown>) {
+    const button = args.button as "home" | "lock" | "volume_up" | "volume_down" | "shake";
+
+    const result = await pressButton(button);
+
+    return {
+      content: [{ type: "text", text: result.success ? result.message : `Failed: ${result.error}` }],
+      isError: !result.success,
+    };
+  }
+
+  private async handleUIScroll(args: Record<string, unknown>) {
+    const direction = args.direction as "up" | "down" | "left" | "right";
+    const amount = (args.amount as number) || 100;
+
+    const result = await scroll(direction, amount);
+
+    return {
+      content: [{ type: "text", text: result.success ? result.message : `Failed: ${result.error}` }],
+      isError: !result.success,
+    };
+  }
+
+  private async handleUIDismissKeyboard() {
+    const result = await dismissKeyboard();
+
+    return {
+      content: [{ type: "text", text: result.success ? result.message : `Failed: ${result.error}` }],
+      isError: !result.success,
+    };
+  }
+
+  private async handleUISetAppearance(args: Record<string, unknown>) {
+    const mode = args.mode as "light" | "dark";
+
+    const result = await setAppearance(mode);
+
+    return {
+      content: [{ type: "text", text: result.success ? result.message : `Failed: ${result.error}` }],
+      isError: !result.success,
+    };
+  }
+
+  // ==========================================
+  // TESTING HANDLERS
+  // ==========================================
+
+  private async handleXcodeTest(args: Record<string, unknown>) {
+    const projectPath = args.projectPath as string;
+    const scheme = args.scheme as string;
+    const testPlan = args.testPlan as string | undefined;
+    const onlyTesting = args.onlyTesting as string[] | undefined;
+    const skipTesting = args.skipTesting as string[] | undefined;
+
+    const result = await runTests(projectPath, {
+      scheme,
+      testPlan,
+      onlyTesting,
+      skipTesting,
+    });
+
+    const formattedResults = formatTestResults(result);
+
+    return {
+      content: [{ type: "text", text: formattedResults }],
+      isError: !result.success,
+    };
+  }
+
+  private async handleXcodeTestList(args: Record<string, unknown>) {
+    const projectPath = args.projectPath as string;
+    const scheme = args.scheme as string;
+
+    const result = await listTests(projectPath, scheme);
+
+    if (!result.success) {
+      return {
+        content: [{ type: "text", text: `Failed to list tests: ${result.error}` }],
+        isError: true,
+      };
+    }
+
+    const output = result.testTargets.length > 0
+      ? result.testTargets
+          .map((t) => `${t.name}:\n${t.tests.map((test) => `  - ${test}`).join("\n")}`)
+          .join("\n\n")
+      : "No tests found";
+
+    return {
+      content: [{ type: "text", text: output }],
+    };
+  }
+
+  private async handleXcodeCoverage(args: Record<string, unknown>) {
+    const projectPath = args.projectPath as string;
+    const scheme = args.scheme as string;
+
+    const result = await getCoverage(projectPath, scheme);
+
+    if (!result.success) {
+      return {
+        content: [{ type: "text", text: `Failed to get coverage: ${result.error}` }],
+        isError: true,
+      };
+    }
+
+    const coverage = result.coverage!;
+    const output = [
+      `Code Coverage: ${coverage.lineCoverage.toFixed(1)}%`,
+      "",
+      "Top Files:",
+      ...coverage.files.slice(0, 10).map(
+        (f) => `  ${f.lineCoverage.toFixed(1)}% - ${f.path} (${f.coveredLines}/${f.executableLines})`
+      ),
+    ].join("\n");
+
+    return {
+      content: [{ type: "text", text: output }],
     };
   }
 

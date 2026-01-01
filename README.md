@@ -47,6 +47,21 @@ This combines build → install → launch → screenshot into one seamless step
 - Get app container paths
 - Retrieve simulator logs
 
+### UI Automation
+- Tap, double-tap, and long press at coordinates
+- Swipe gestures in any direction
+- Type text and press keys
+- Hardware button simulation (home, lock, volume)
+- Scroll in any direction
+- Rotate device
+- Light/dark mode switching
+
+### XCTest Integration
+- Run unit and UI tests
+- List available test targets and methods
+- Code coverage reports
+- Detailed test results with failure messages
+
 ## Installation
 
 ```bash
@@ -273,6 +288,130 @@ Get recent logs from a simulator.
 - `predicate` (optional): Custom log predicate
 - `udid` (optional): Simulator UDID
 
+### UI Automation
+
+These tools enable automated UI interactions with the iOS Simulator.
+
+#### `ui_tap`
+Tap at specific screen coordinates.
+
+**Parameters:**
+- `x` (required): X coordinate
+- `y` (required): Y coordinate
+- `udid` (optional): Simulator UDID
+
+#### `ui_double_tap`
+Double tap at coordinates.
+
+**Parameters:**
+- `x` (required): X coordinate
+- `y` (required): Y coordinate
+- `udid` (optional): Simulator UDID
+
+#### `ui_long_press`
+Long press at coordinates.
+
+**Parameters:**
+- `x` (required): X coordinate
+- `y` (required): Y coordinate
+- `duration` (optional): Duration in milliseconds (default: 1000)
+- `udid` (optional): Simulator UDID
+
+#### `ui_swipe`
+Swipe from one point to another.
+
+**Parameters:**
+- `fromX` (required): Starting X coordinate
+- `fromY` (required): Starting Y coordinate
+- `toX` (required): Ending X coordinate
+- `toY` (required): Ending Y coordinate
+- `duration` (optional): Swipe duration in milliseconds
+- `udid` (optional): Simulator UDID
+
+#### `ui_type`
+Type text into the focused field.
+
+**Parameters:**
+- `text` (required): Text to type
+- `udid` (optional): Simulator UDID
+
+#### `ui_press_key`
+Press a key or key combination.
+
+**Parameters:**
+- `key` (required): Key to press (e.g., "enter", "tab", "escape", "up", "down")
+- `modifiers` (optional): Array of modifiers ["command", "control", "option", "shift"]
+
+#### `ui_press_button`
+Press a hardware button.
+
+**Parameters:**
+- `button` (required): Button name ("home", "lock", "volume_up", "volume_down", "shake")
+- `udid` (optional): Simulator UDID
+
+#### `ui_scroll`
+Scroll in a direction.
+
+**Parameters:**
+- `direction` (required): "up", "down", "left", or "right"
+- `amount` (optional): Scroll amount in pixels (default: 100)
+- `udid` (optional): Simulator UDID
+
+#### `ui_dismiss_keyboard`
+Dismiss the on-screen keyboard.
+
+**Parameters:**
+- `udid` (optional): Simulator UDID
+
+#### `ui_set_appearance`
+Set light or dark mode.
+
+**Parameters:**
+- `mode` (required): "light" or "dark"
+- `udid` (optional): Simulator UDID
+
+---
+
+### XCTest Integration
+
+Tools for running and analyzing tests.
+
+#### `xcode_test`
+Run XCTest unit or UI tests.
+
+**Parameters:**
+- `projectPath` (required): Path to .xcodeproj or .xcworkspace
+- `scheme` (required): Xcode scheme to test
+- `testPlan` (optional): Test plan name
+- `testTarget` (optional): Specific test target
+- `testClass` (optional): Specific test class
+- `testMethod` (optional): Specific test method
+- `configuration` (optional): Build configuration (default: "Debug")
+- `destination` (optional): Test destination
+- `enableCoverage` (optional): Enable code coverage
+
+**Example:**
+```
+"Run tests for MyApp scheme"
+"Run only the LoginTests class"
+```
+
+#### `xcode_test_list`
+List all available test targets and test methods.
+
+**Parameters:**
+- `projectPath` (required): Path to .xcodeproj or .xcworkspace
+- `scheme` (required): Xcode scheme
+
+#### `xcode_coverage`
+Get code coverage report after running tests with coverage enabled.
+
+**Parameters:**
+- `projectPath` (required): Path to .xcodeproj or .xcworkspace
+- `scheme` (required): Xcode scheme
+
+---
+
 ### System Info
 
 #### `ios_dev_info`
@@ -310,6 +449,30 @@ Claude:
 2. Analyzes the crash logs and provides debugging suggestions
 ```
 
+### UI Automation Testing
+```
+User: Tap on the login button and enter my credentials
+
+Claude:
+1. Uses ui_tap to tap the login button at coordinates
+2. Uses ui_type to enter username
+3. Uses ui_tap to move to password field
+4. Uses ui_type to enter password
+5. Uses ui_tap to submit
+6. Uses simulator_screenshot to capture result
+```
+
+### Run Unit Tests
+```
+User: Run the tests for my app and show me the results
+
+Claude:
+1. Uses xcode_test to run tests with coverage enabled
+2. Parses test results showing passed/failed tests
+3. Uses xcode_coverage to get code coverage report
+4. Provides summary of test results and coverage
+```
+
 ## Requirements
 
 - macOS 13.0+ (for Xcode and Simulator support)
@@ -339,9 +502,14 @@ ios-dev-mcp/
 │   ├── swift/
 │   │   └── executor.ts       # Swift code execution
 │   ├── xcode/
-│   │   └── builder.ts        # Xcode build tools
+│   │   ├── builder.ts        # Xcode build tools
+│   │   └── testing.ts        # XCTest execution
 │   ├── simulator/
 │   │   └── controller.ts     # iOS Simulator control
+│   ├── ui/
+│   │   └── automation.ts     # UI automation (tap, swipe, type)
+│   ├── workflow/
+│   │   └── dev.ts            # Iterative development session
 │   └── utils/
 │       ├── process.ts        # Command execution utilities
 │       └── tempfile.ts       # Temp file management
