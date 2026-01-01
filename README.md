@@ -2,35 +2,95 @@
 
 A unified Model Context Protocol (MCP) server that brings together Swift code execution, Xcode project building, iOS Simulator control, and device testing into one seamless development workflow with Claude.
 
-## 🎯 Vision
+## Iterative Development (Replit-like Experience)
 
-Enable Claude to be a true iOS development partner - from ideation through code, build, test, and debug - all in a single conversational flow. No more context-switching between fragmented tools.
+The standout feature of this MCP server is the **iterative development workflow** - similar to Replit's live preview. Instead of manually building, installing, and launching your app, just use:
 
-## ✨ Features
+```
+1. "Start a dev session for my app at ~/MyApp/MyApp.xcodeproj"
+2. Make code changes
+3. "Rebuild and show me the result"
+4. See screenshot of your running app
+5. Repeat!
+```
 
-### Phase 1 (MVP) - In Development
-- [ ] **Swift Code Execution** - Run Swift code snippets and experiments
-- [ ] **Xcode Project Building** - Build iOS/macOS projects  
-- [ ] **Simulator Control** - Launch, control, and screenshot iOS Simulator
-- [ ] **Basic Testing** - Run XCTest suites
+This combines build → install → launch → screenshot into one seamless step, giving you immediate visual feedback on your changes.
 
-### Phase 2 (Planned)
-- [ ] **UI Automation** - Tap, swipe, type, and interact with UI elements
-- [ ] **Visual Testing** - Screenshot comparison and UI regression detection
-- [ ] **Real Device Support** - Deploy and test on physical iOS devices
-- [ ] **SwiftUI Previews** - Generate and control SwiftUI previews
+## Features
 
-### Phase 3 (Future)
-- [ ] **Intelligent Testing** - AI-suggested test scenarios based on code analysis
-- [ ] **Performance Profiling** - Memory, CPU, and battery usage analysis
-- [ ] **Crash Analysis** - Automatic crash log parsing and debugging assistance
-- [ ] **CI/CD Integration** - Connect with GitHub Actions, Fastlane, etc.
+### Iterative Development Workflow (NEW!)
+- **Session-based development** - Set up once, iterate quickly
+- **One-command build & run** - Build, install, launch, and screenshot automatically
+- **Quick restart** - Rapid rebuilds for small changes
+- **Live preview** - Take screenshots at any time to see current state
 
-## 🚀 Quick Start
+### Swift Code Execution
+- Execute Swift code snippets directly
+- Automatic temp file management
+- Timeout handling (configurable, default 30s)
+- Compilation and runtime error capture
+
+### Xcode Building
+- Build projects (.xcodeproj) and workspaces (.xcworkspace)
+- List schemes, configurations, and targets
+- Get build settings
+- Parse build warnings and errors
+- Support for Debug/Release configurations
+
+### iOS Simulator Control
+- List all available simulators and runtimes
+- Boot and shutdown simulators
+- Install and uninstall apps
+- Launch and terminate apps
+- Take screenshots
+- Open URLs (deep links)
+- Get app container paths
+- Retrieve simulator logs
+
+### UI Automation
+- Tap, double-tap, and long press at coordinates
+- Swipe gestures in any direction
+- Type text and press keys
+- Hardware button simulation (home, lock, volume)
+- Scroll in any direction
+- Rotate device
+- Light/dark mode switching
+
+### XCTest Integration
+- Run unit and UI tests
+- List available test targets and methods
+- Code coverage reports
+- Detailed test results with failure messages
+
+### Smart Error Diagnostics
+- Parse build errors and suggest fixes
+- Track recurring issues to prevent debugging loops
+- Common Swift/Xcode error patterns with solutions
+- Session statistics for error patterns
+
+### Video Recording
+- Record simulator interactions as video
+- Great for debugging UI flows and sharing issues
+
+### Push Notifications
+- Send test push notifications to simulator
+- Configure title, body, badge, and sound
+
+### Environment Simulation
+- Network conditioning (3G, LTE, WiFi, offline, etc.)
+- GPS location simulation with presets
+- Memory warning triggers
+- Biometric simulation (Face ID / Touch ID)
+
+### CLAUDE.md Integration
+- Auto-generate project context files
+- Helps Claude understand your project structure
+
+## Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/ios-dev-mcp.git
+git clone https://github.com/bhavenmurji/ios-dev-mcp.git
 cd ios-dev-mcp
 
 # Install dependencies
@@ -38,12 +98,9 @@ npm install
 
 # Build the server
 npm run build
-
-# Run the server
-npm start
 ```
 
-### Configure with Claude Desktop
+## Configure with Claude Desktop
 
 Add to your `claude_desktop_config.json`:
 
@@ -58,97 +115,560 @@ Add to your `claude_desktop_config.json`:
 }
 ```
 
-## 📚 Usage Examples
+Replace `/path/to/ios-dev-mcp` with the actual path to your cloned repository.
 
-### Swift Code Execution
-```
-Claude: Let me run that Swift code for you...
-> let greeting = "Hello, World!"
-> print(greeting)
-Output: Hello, World!
-```
+## Configure with Claude Code (CLI)
 
-### Build & Run Project
-```
-Claude: Building your iOS project...
-✓ Build succeeded
-✓ Launched on iPhone 15 Pro Simulator
-📸 Here's what your app looks like
+```bash
+claude mcp add ios-dev --scope user \
+  --command "node" \
+  --args "/path/to/ios-dev-mcp/build/index.js"
 ```
 
-### UI Testing
-```
-Claude: I'll test that login flow...
-✓ Tapped email field
-✓ Entered "test@example.com"
-✓ Tapped password field
-✓ Entered password
-✓ Tapped login button
-✓ Verified dashboard appeared
+Or create/edit `~/.claude.json`:
+
+```json
+{
+  "mcpServers": {
+    "ios-dev": {
+      "command": "node",
+      "args": ["/path/to/ios-dev-mcp/build/index.js"]
+    }
+  }
+}
 ```
 
-## 🏗️ Architecture
+## Available Tools
+
+### Iterative Development (Recommended!)
+
+These tools provide a Replit-like experience for iOS development.
+
+#### `dev_session_start`
+Start a development session for iterative iOS development. **Start here!**
+
+**Parameters:**
+- `projectPath` (required): Path to .xcodeproj or .xcworkspace
+- `scheme` (optional): Xcode scheme (auto-detected if not specified)
+- `simulatorName` (optional): Simulator device name (e.g., 'iPhone 15 Pro')
+
+**Example:**
+```
+"Start a dev session for ~/MyApp/MyApp.xcodeproj"
+```
+
+#### `dev_run`
+Build, install, launch, and screenshot in one step. The main iteration command.
+
+**Parameters:**
+- `clean` (optional): Clean build before building
+
+**Example:**
+```
+"Build and run my app" or "dev_run"
+```
+
+#### `dev_restart`
+Quick rebuild and relaunch. Faster than dev_run for small changes.
+
+**Example:**
+```
+"Rebuild and show me the result" or "Restart the app"
+```
+
+#### `dev_preview`
+Take a screenshot without rebuilding.
+
+**Parameters:**
+- `outputPath` (optional): Custom screenshot path
+
+#### `dev_session_info`
+Show current session details (project, scheme, simulator, last build).
+
+#### `dev_session_end`
+End the current development session.
+
+---
+
+### Swift Execution
+
+#### `swift_execute`
+Execute Swift code and return the output.
+
+**Parameters:**
+- `code` (required): Swift code to execute
+- `timeout` (optional): Execution timeout in milliseconds (default: 30000)
+
+**Example:**
+```
+swift_execute with code: "print(\"Hello, World!\")"
+```
+
+### Xcode Building
+
+#### `xcode_list_schemes`
+List all available schemes, configurations, and targets in an Xcode project.
+
+**Parameters:**
+- `projectPath` (required): Path to .xcodeproj or .xcworkspace
+
+#### `xcode_build`
+Build an Xcode project or workspace.
+
+**Parameters:**
+- `projectPath` (required): Path to .xcodeproj or .xcworkspace
+- `scheme` (required): Xcode scheme to build
+- `configuration` (optional): "Debug" or "Release" (default: "Debug")
+- `sdk` (optional): SDK to build for (e.g., "iphonesimulator", "iphoneos")
+- `destination` (optional): Build destination
+- `clean` (optional): Clean before building
+
+#### `xcode_get_build_settings`
+Get build settings for a project scheme.
+
+**Parameters:**
+- `projectPath` (required): Path to .xcodeproj or .xcworkspace
+- `scheme` (required): Xcode scheme
+
+### Simulator Control
+
+#### `simulator_list`
+List all available iOS simulators.
+
+**Parameters:**
+- `onlyBooted` (optional): Only return booted simulators
+- `onlyAvailable` (optional): Only return available simulators
+
+#### `simulator_boot`
+Boot an iOS simulator.
+
+**Parameters:**
+- `udid` (optional): Simulator UDID
+- `deviceName` (optional): Device name (e.g., "iPhone 15 Pro")
+- `osVersion` (optional): iOS version (e.g., "17.2")
+
+#### `simulator_shutdown`
+Shutdown an iOS simulator.
+
+**Parameters:**
+- `udid` (optional): Simulator UDID (if not provided, shuts down booted simulator)
+
+#### `simulator_install_app`
+Install an app on a simulator.
+
+**Parameters:**
+- `appPath` (required): Path to .app bundle
+- `udid` (optional): Simulator UDID (uses booted simulator if not provided)
+
+#### `simulator_uninstall_app`
+Uninstall an app from a simulator.
+
+**Parameters:**
+- `bundleId` (required): App bundle identifier
+- `udid` (optional): Simulator UDID
+
+#### `simulator_launch_app`
+Launch an app on a simulator.
+
+**Parameters:**
+- `bundleId` (required): App bundle identifier
+- `udid` (optional): Simulator UDID
+- `args` (optional): Command-line arguments to pass
+
+#### `simulator_terminate_app`
+Terminate a running app.
+
+**Parameters:**
+- `bundleId` (required): App bundle identifier
+- `udid` (optional): Simulator UDID
+
+#### `simulator_screenshot`
+Take a screenshot of a simulator.
+
+**Parameters:**
+- `outputPath` (optional): Where to save the screenshot
+- `udid` (optional): Simulator UDID
+
+#### `simulator_open_url`
+Open a URL in a simulator.
+
+**Parameters:**
+- `url` (required): URL to open (can be deep link)
+- `udid` (optional): Simulator UDID
+
+#### `simulator_get_app_container`
+Get the container path for an installed app.
+
+**Parameters:**
+- `bundleId` (required): App bundle identifier
+- `containerType` (optional): "app", "data", or "groups" (default: "app")
+- `udid` (optional): Simulator UDID
+
+#### `simulator_get_logs`
+Get recent logs from a simulator.
+
+**Parameters:**
+- `bundleId` (optional): Filter logs by app
+- `predicate` (optional): Custom log predicate
+- `udid` (optional): Simulator UDID
+
+### UI Automation
+
+These tools enable automated UI interactions with the iOS Simulator.
+
+#### `ui_tap`
+Tap at specific screen coordinates.
+
+**Parameters:**
+- `x` (required): X coordinate
+- `y` (required): Y coordinate
+- `udid` (optional): Simulator UDID
+
+#### `ui_double_tap`
+Double tap at coordinates.
+
+**Parameters:**
+- `x` (required): X coordinate
+- `y` (required): Y coordinate
+- `udid` (optional): Simulator UDID
+
+#### `ui_long_press`
+Long press at coordinates.
+
+**Parameters:**
+- `x` (required): X coordinate
+- `y` (required): Y coordinate
+- `duration` (optional): Duration in milliseconds (default: 1000)
+- `udid` (optional): Simulator UDID
+
+#### `ui_swipe`
+Swipe from one point to another.
+
+**Parameters:**
+- `fromX` (required): Starting X coordinate
+- `fromY` (required): Starting Y coordinate
+- `toX` (required): Ending X coordinate
+- `toY` (required): Ending Y coordinate
+- `duration` (optional): Swipe duration in milliseconds
+- `udid` (optional): Simulator UDID
+
+#### `ui_type`
+Type text into the focused field.
+
+**Parameters:**
+- `text` (required): Text to type
+- `udid` (optional): Simulator UDID
+
+#### `ui_press_key`
+Press a key or key combination.
+
+**Parameters:**
+- `key` (required): Key to press (e.g., "enter", "tab", "escape", "up", "down")
+- `modifiers` (optional): Array of modifiers ["command", "control", "option", "shift"]
+
+#### `ui_press_button`
+Press a hardware button.
+
+**Parameters:**
+- `button` (required): Button name ("home", "lock", "volume_up", "volume_down", "shake")
+- `udid` (optional): Simulator UDID
+
+#### `ui_scroll`
+Scroll in a direction.
+
+**Parameters:**
+- `direction` (required): "up", "down", "left", or "right"
+- `amount` (optional): Scroll amount in pixels (default: 100)
+- `udid` (optional): Simulator UDID
+
+#### `ui_dismiss_keyboard`
+Dismiss the on-screen keyboard.
+
+**Parameters:**
+- `udid` (optional): Simulator UDID
+
+#### `ui_set_appearance`
+Set light or dark mode.
+
+**Parameters:**
+- `mode` (required): "light" or "dark"
+- `udid` (optional): Simulator UDID
+
+---
+
+### XCTest Integration
+
+Tools for running and analyzing tests.
+
+#### `xcode_test`
+Run XCTest unit or UI tests.
+
+**Parameters:**
+- `projectPath` (required): Path to .xcodeproj or .xcworkspace
+- `scheme` (required): Xcode scheme to test
+- `testPlan` (optional): Test plan name
+- `testTarget` (optional): Specific test target
+- `testClass` (optional): Specific test class
+- `testMethod` (optional): Specific test method
+- `configuration` (optional): Build configuration (default: "Debug")
+- `destination` (optional): Test destination
+- `enableCoverage` (optional): Enable code coverage
+
+**Example:**
+```
+"Run tests for MyApp scheme"
+"Run only the LoginTests class"
+```
+
+#### `xcode_test_list`
+List all available test targets and test methods.
+
+**Parameters:**
+- `projectPath` (required): Path to .xcodeproj or .xcworkspace
+- `scheme` (required): Xcode scheme
+
+#### `xcode_coverage`
+Get code coverage report after running tests with coverage enabled.
+
+**Parameters:**
+- `projectPath` (required): Path to .xcodeproj or .xcworkspace
+- `scheme` (required): Xcode scheme
+
+---
+
+### System Info
+
+#### `ios_dev_info`
+Get information about available iOS development tools.
+
+---
+
+### Smart Error Diagnostics
+
+#### `analyze_build_errors`
+Analyze build errors and suggest fixes. Tracks recurring issues to prevent debugging loops.
+
+**Parameters:**
+- `buildOutput` (required): The raw build output containing errors
+
+#### `get_error_stats`
+Get statistics about errors encountered in this session.
+
+---
+
+### Video Recording
+
+#### `simulator_start_recording`
+Start recording video of the simulator screen.
+
+**Parameters:**
+- `udid` (optional): Simulator UDID
+- `outputPath` (optional): Where to save the video
+
+#### `simulator_stop_recording`
+Stop the current video recording and save the file.
+
+**Parameters:**
+- `udid` (optional): Simulator UDID
+
+---
+
+### Push Notifications
+
+#### `send_push`
+Send a push notification to an app in the simulator.
+
+**Parameters:**
+- `bundleId` (required): App bundle identifier
+- `title` (required): Notification title
+- `body` (required): Notification body text
+- `badge` (optional): Badge number
+- `udid` (optional): Simulator UDID
+
+---
+
+### Environment Simulation
+
+#### `set_network_condition`
+Simulate different network conditions.
+
+**Parameters:**
+- `condition` (required): "100% Loss", "3G", "DSL", "Edge", "LTE", "Very Bad Network", "WiFi", or "reset"
+- `udid` (optional): Simulator UDID
+
+#### `set_location`
+Set the simulated GPS location.
+
+**Parameters:**
+- `latitude` (optional): Latitude coordinate
+- `longitude` (optional): Longitude coordinate
+- `preset` (optional): "apple", "london", "tokyo", "newyork", "sydney", "sanfrancisco"
+- `udid` (optional): Simulator UDID
+
+#### `trigger_memory_warning`
+Trigger a memory warning in the running app.
+
+**Parameters:**
+- `udid` (optional): Simulator UDID
+
+#### `simulate_biometric`
+Simulate Face ID or Touch ID authentication.
+
+**Parameters:**
+- `match` (required): Whether the biometric should match (true) or fail (false)
+- `udid` (optional): Simulator UDID
+
+---
+
+### CLAUDE.md Integration
+
+#### `generate_claude_md`
+Generate a CLAUDE.md context file for an iOS project.
+
+**Parameters:**
+- `projectPath` (required): Path to .xcodeproj or .xcworkspace
+- `outputPath` (optional): Where to save CLAUDE.md
+
+---
+
+### Accessibility Inspection
+
+#### `ui_describe_screen`
+Describe the current screen's interactive elements.
+
+**Parameters:**
+- `udid` (optional): Simulator UDID
+
+#### `ui_find_element`
+Find a UI element by label, identifier, or type.
+
+**Parameters:**
+- `label` (optional): Element accessibility label
+- `identifier` (optional): Element accessibility identifier
+- `type` (optional): Element type (button, textField, etc.)
+
+## Example Workflows
+
+### Run Swift Code
+```
+User: Can you run this Swift code: let numbers = [1, 2, 3, 4, 5]; print(numbers.reduce(0, +))
+
+Claude uses swift_execute to run the code and returns: 15
+```
+
+### Build and Run App
+```
+User: Build my app and run it on the simulator
+
+Claude:
+1. Uses xcode_list_schemes to find available schemes
+2. Uses xcode_build to build the project
+3. Uses simulator_list to find available simulators
+4. Uses simulator_boot to start a simulator
+5. Uses simulator_install_app to install the built app
+6. Uses simulator_launch_app to run the app
+7. Uses simulator_screenshot to capture the result
+```
+
+### Debug App Issues
+```
+User: My app is crashing, can you check the logs?
+
+Claude:
+1. Uses simulator_get_logs to retrieve recent logs
+2. Analyzes the crash logs and provides debugging suggestions
+```
+
+### UI Automation Testing
+```
+User: Tap on the login button and enter my credentials
+
+Claude:
+1. Uses ui_tap to tap the login button at coordinates
+2. Uses ui_type to enter username
+3. Uses ui_tap to move to password field
+4. Uses ui_type to enter password
+5. Uses ui_tap to submit
+6. Uses simulator_screenshot to capture result
+```
+
+### Run Unit Tests
+```
+User: Run the tests for my app and show me the results
+
+Claude:
+1. Uses xcode_test to run tests with coverage enabled
+2. Parses test results showing passed/failed tests
+3. Uses xcode_coverage to get code coverage report
+4. Provides summary of test results and coverage
+```
+
+## Requirements
+
+- macOS 13.0+ (for Xcode and Simulator support)
+- Xcode 15.0+ with command-line tools
+- Node.js 18+
+- Swift 5.9+
+
+## Development
+
+```bash
+# Run tests
+npm test
+
+# Build in watch mode
+npm run watch
+
+# Lint code
+npm run lint
+```
+
+## Architecture
 
 ```
 ios-dev-mcp/
 ├── src/
 │   ├── index.ts              # MCP server entry point
-│   ├── swift/                # Swift execution engine
-│   ├── xcode/                # Xcode build tools
-│   ├── simulator/            # iOS Simulator control
-│   ├── device/               # Real device support
-│   └── utils/                # Shared utilities
-├── examples/                 # Example projects & workflows
-├── docs/                     # Documentation
-└── tests/                    # Test suites
+│   ├── swift/
+│   │   └── executor.ts       # Swift code execution
+│   ├── xcode/
+│   │   ├── builder.ts        # Xcode build tools
+│   │   └── testing.ts        # XCTest execution
+│   ├── simulator/
+│   │   ├── controller.ts     # iOS Simulator control
+│   │   └── advanced.ts       # Video, push, network, biometrics
+│   ├── ui/
+│   │   ├── automation.ts     # UI automation (tap, swipe, type)
+│   │   └── accessibility.ts  # Element inspection
+│   ├── workflow/
+│   │   └── dev.ts            # Iterative development session
+│   ├── context/
+│   │   └── claude-md.ts      # CLAUDE.md generation
+│   ├── diagnostics/
+│   │   └── error-fixer.ts    # Smart error analysis
+│   └── utils/
+│       ├── process.ts        # Command execution utilities
+│       └── tempfile.ts       # Temp file management
+├── tests/                    # Test suites
+├── examples/                 # Example usage
+└── docs/                     # Documentation
 ```
 
-## 🤝 Contributing
+## Contributing
 
-We welcome contributions! This project consolidates and extends the excellent work from:
-- [SwiftClaude](https://github.com/GeorgeLyon/SwiftClaude) - Swift code execution
-- [ios-simulator-mcp](https://github.com/joshuayoes/ios-simulator-mcp) - Simulator control
-- [XcodeBuildMCP](https://github.com/cameroncooke/XcodeBuildMCP) - Xcode building
-- [xcode-mcp-server](https://github.com/r-huijts/xcode-mcp-server) - Comprehensive Xcode tools
+Contributions are welcome! This project builds on ideas from:
+- [SwiftClaude](https://github.com/GeorgeLyon/SwiftClaude)
+- [ios-simulator-mcp](https://github.com/joshuayoes/ios-simulator-mcp)
+- [XcodeBuildMCP](https://github.com/cameroncooke/XcodeBuildMCP)
+- [xcode-mcp-server](https://github.com/r-huijts/xcode-mcp-server)
 
-### How to Contribute
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+## License
 
-## 📋 Requirements
+MIT License - see [LICENSE](LICENSE) for details.
 
-- macOS 13.0+ (for Xcode and Simulator support)
-- Xcode 15.0+
-- Node.js 18+
-- Swift 5.9+
-
-## 🗺️ Roadmap
-
-**Q1 2025**
-- ✅ Project initialization
-- [ ] MVP release (Swift execution + basic building)
-- [ ] Community feedback and iteration
-
-**Q2 2025**
-- [ ] Full UI automation support
-- [ ] Real device testing
-- [ ] Visual regression testing
-
-**Q3 2025**
-- [ ] AI-powered testing suggestions
-- [ ] Performance profiling
-- [ ] CI/CD integrations
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) for details
-
-## 🙏 Acknowledgments
+## Acknowledgments
 
 Built on the shoulders of giants. Special thanks to:
 - George Lyon (SwiftClaude)
@@ -157,13 +677,3 @@ Built on the shoulders of giants. Special thanks to:
 - R. Huijts (xcode-mcp-server)
 - The Anthropic team for MCP
 - The iOS development community
-
-## 📬 Contact
-
-- **Issues:** [GitHub Issues](https://github.com/yourusername/ios-dev-mcp/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/yourusername/ios-dev-mcp/discussions)
-- **Twitter:** [@yourusername](https://twitter.com/yourusername)
-
----
-
-**Made with ❤️ for the iOS development community**
