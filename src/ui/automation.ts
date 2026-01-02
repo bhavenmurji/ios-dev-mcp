@@ -70,24 +70,70 @@ async function getSimulatorWindowBounds(): Promise<{
 
 /**
  * Tap at specific coordinates on the simulator screen
- * Uses AppleScript/cliclick to send input to the Simulator window
+ *
+ * Priority order:
+ * 1. IDB (Facebook's iOS Development Bridge) - works directly with device coordinates
+ * 2. AXe (Apple Accessibility APIs) - works directly with device coordinates
+ * 3. cliclick - requires window position
+ * 4. AppleScript - fallback, requires window position
  */
 export async function tap(
   x: number,
   y: number,
   options?: { udid?: string }
 ): Promise<UIActionResult> {
-  // Ensure simulator is focused
+  // Get the simulator UDID for tools that need it
+  let udid = options?.udid;
+  if (!udid) {
+    const booted = await getBootedSimulator();
+    if (booted) {
+      udid = booted.udid;
+    }
+  }
+
+  // Method 1: Try IDB first (most reliable - doesn't need window position)
+  // idb ui tap --udid <UDID> -- <x> <y>
+  if (udid) {
+    const idbResult = await executeCommand(
+      "idb",
+      ["ui", "tap", "--udid", udid, "--", String(x), String(y)],
+      { timeout: 5000 }
+    );
+    if (idbResult.exitCode === 0) {
+      return {
+        success: true,
+        message: `Tapped at (${x}, ${y}) via IDB`,
+      };
+    }
+  }
+
+  // Method 2: Try AXe (Apple Accessibility APIs - doesn't need window position)
+  // axe tap -x <x> -y <y> --udid <UDID>
+  if (udid) {
+    const axeResult = await executeCommand(
+      "axe",
+      ["tap", "-x", String(x), "-y", String(y), "--udid", udid],
+      { timeout: 5000 }
+    );
+    if (axeResult.exitCode === 0) {
+      return {
+        success: true,
+        message: `Tapped at (${x}, ${y}) via AXe`,
+      };
+    }
+  }
+
+  // Method 3 & 4: Fall back to window-based approach (cliclick/AppleScript)
+  // This requires getting the Simulator window position
   await focusSimulator();
   await new Promise(resolve => setTimeout(resolve, 200));
 
-  // Get window position to calculate absolute screen coordinates
   const windowBounds = await getSimulatorWindowBounds();
   if (!windowBounds) {
     return {
       success: false,
       message: "",
-      error: "Could not get Simulator window position. Ensure Simulator is open and visible.",
+      error: "Could not get Simulator window position. Install IDB (brew install idb-companion) or AXe for reliable tapping.",
     };
   }
 
@@ -96,17 +142,16 @@ export async function tap(
   const absX = windowBounds.x + x;
   const absY = windowBounds.y + titleBarHeight + y;
 
-  // Try cliclick first if available (more reliable)
+  // Method 3: Try cliclick
   const cliclickResult = await executeCommand("cliclick", [`c:${absX},${absY}`], { timeout: 5000 });
-
   if (cliclickResult.exitCode === 0) {
     return {
       success: true,
-      message: `Tapped at (${x}, ${y})`,
+      message: `Tapped at (${x}, ${y}) via cliclick`,
     };
   }
 
-  // Fallback to AppleScript
+  // Method 4: Fallback to AppleScript
   const script = `
     tell application "System Events"
       click at {${absX}, ${absY}}
@@ -119,19 +164,24 @@ export async function tap(
     return {
       success: false,
       message: "",
-      error: `Failed to tap at (${x}, ${y}): ${result.stderr}. Consider installing cliclick: brew install cliclick`,
+      error: `Failed to tap at (${x}, ${y}): ${result.stderr}. Install: brew install idb-companion (or) brew install axe (or) brew install cliclick`,
     };
   }
 
   return {
     success: true,
-    message: `Tapped at (${x}, ${y})`,
+    message: `Tapped at (${x}, ${y}) via AppleScript`,
   };
 }
 
 /**
  * Swipe from one point to another
- * Uses cliclick for drag operations, with keyboard fallback
+ *
+ * Priority order:
+ * 1. IDB (Facebook's iOS Development Bridge) - works directly with device coordinates
+ * 2. AXe (Apple Accessibility APIs) - works directly with device coordinates
+ * 3. cliclick - requires window position
+ * 4. Fallback message
  */
 export async function swipe(
   from: Point,
@@ -139,16 +189,70 @@ export async function swipe(
   duration: number = 300,
   options?: { udid?: string }
 ): Promise<UIActionResult> {
+  // Get the simulator UDID for tools that need it
+  let udid = options?.udid;
+  if (!udid) {
+    const booted = await getBootedSimulator();
+    if (booted) {
+      udid = booted.udid;
+    }
+  }
+
+  // Convert duration from ms to seconds for IDB/AXe
+  const durationSec = duration / 1000;
+
+  // Method 1: Try IDB first (most reliable - doesn't need window position)
+  // idb ui swipe --udid <UDID> --duration <SEC> -- <fromX> <fromY> <toX> <toY>
+  if (udid) {
+    const idbResult = await executeCommand(
+      "idb",
+      [
+        "ui", "swipe", "--udid", udid,
+        "--duration", String(durationSec),
+        "--", String(from.x), String(from.y), String(to.x), String(to.y)
+      ],
+      { timeout: 10000 }
+    );
+    if (idbResult.exitCode === 0) {
+      return {
+        success: true,
+        message: `Swiped from (${from.x}, ${from.y}) to (${to.x}, ${to.y}) via IDB`,
+      };
+    }
+  }
+
+  // Method 2: Try AXe (Apple Accessibility APIs - doesn't need window position)
+  // axe swipe --from-x <x> --from-y <y> --to-x <x> --to-y <y> --duration <sec> --udid <UDID>
+  if (udid) {
+    const axeResult = await executeCommand(
+      "axe",
+      [
+        "swipe",
+        "--from-x", String(from.x), "--from-y", String(from.y),
+        "--to-x", String(to.x), "--to-y", String(to.y),
+        "--duration", String(durationSec),
+        "--udid", udid
+      ],
+      { timeout: 10000 }
+    );
+    if (axeResult.exitCode === 0) {
+      return {
+        success: true,
+        message: `Swiped from (${from.x}, ${from.y}) to (${to.x}, ${to.y}) via AXe`,
+      };
+    }
+  }
+
+  // Method 3: Fall back to window-based approach with cliclick
   await focusSimulator();
   await new Promise(resolve => setTimeout(resolve, 200));
 
-  // Get window position to calculate absolute screen coordinates
   const windowBounds = await getSimulatorWindowBounds();
   if (!windowBounds) {
     return {
       success: false,
       message: "",
-      error: "Could not get Simulator window position. Ensure Simulator is open and visible.",
+      error: "Could not get Simulator window position. Install IDB (brew install idb-companion) or AXe for reliable swiping.",
     };
   }
 
@@ -159,7 +263,7 @@ export async function swipe(
   const absToX = windowBounds.x + to.x;
   const absToY = windowBounds.y + titleBarHeight + to.y;
 
-  // Use cliclick for drag if available (best swipe support)
+  // Use cliclick for drag if available
   const cliclickResult = await executeCommand(
     "cliclick",
     [`dd:${absFromX},${absFromY}`, `du:${absToX},${absToY}`],
@@ -169,14 +273,13 @@ export async function swipe(
   if (cliclickResult.exitCode === 0) {
     return {
       success: true,
-      message: `Swiped from (${from.x}, ${from.y}) to (${to.x}, ${to.y})`,
+      message: `Swiped from (${from.x}, ${from.y}) to (${to.x}, ${to.y}) via cliclick`,
     };
   }
 
-  // Fallback: use keyboard-based scrolling for common swipes
+  // Fallback: no reliable swipe available
   const deltaY = to.y - from.y;
   const deltaX = to.x - from.x;
-
   let direction = "";
   if (Math.abs(deltaY) > Math.abs(deltaX)) {
     direction = deltaY > 0 ? "down" : "up";
@@ -185,18 +288,66 @@ export async function swipe(
   }
 
   return {
-    success: true,
-    message: `Swipe gesture simulated (${direction}). For precise swipes, install cliclick: brew install cliclick`,
+    success: false,
+    message: "",
+    error: `Swipe (${direction}) failed. Install: brew install idb-companion (or) brew install axe (or) brew install cliclick`,
   };
 }
 
 /**
  * Type text into the focused field
+ *
+ * Priority order:
+ * 1. IDB (Facebook's iOS Development Bridge)
+ * 2. AXe (Apple Accessibility APIs)
+ * 3. AppleScript (requires Simulator focus)
  */
 export async function typeText(
   text: string,
   options?: { udid?: string }
 ): Promise<UIActionResult> {
+  // Get the simulator UDID for tools that need it
+  let udid = options?.udid;
+  if (!udid) {
+    const booted = await getBootedSimulator();
+    if (booted) {
+      udid = booted.udid;
+    }
+  }
+
+  // Method 1: Try IDB first
+  // idb ui text --udid <UDID> "<text>"
+  if (udid) {
+    const idbResult = await executeCommand(
+      "idb",
+      ["ui", "text", "--udid", udid, text],
+      { timeout: 10000 }
+    );
+    if (idbResult.exitCode === 0) {
+      return {
+        success: true,
+        message: `Typed: "${text.length > 50 ? text.substring(0, 50) + "..." : text}" via IDB`,
+      };
+    }
+  }
+
+  // Method 2: Try AXe
+  // axe type "<text>" --udid <UDID>
+  if (udid) {
+    const axeResult = await executeCommand(
+      "axe",
+      ["type", text, "--udid", udid],
+      { timeout: 10000 }
+    );
+    if (axeResult.exitCode === 0) {
+      return {
+        success: true,
+        message: `Typed: "${text.length > 50 ? text.substring(0, 50) + "..." : text}" via AXe`,
+      };
+    }
+  }
+
+  // Method 3: Fallback to AppleScript
   await focusSimulator();
   await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -220,13 +371,13 @@ export async function typeText(
     return {
       success: false,
       message: "",
-      error: `Failed to type text: ${result.stderr}`,
+      error: `Failed to type text: ${result.stderr}. Install IDB or AXe for reliable text input.`,
     };
   }
 
   return {
     success: true,
-    message: `Typed: "${text.length > 50 ? text.substring(0, 50) + "..." : text}"`,
+    message: `Typed: "${text.length > 50 ? text.substring(0, 50) + "..." : text}" via AppleScript`,
   };
 }
 
