@@ -243,6 +243,26 @@ export async function getBootedSimulator(): Promise<SimulatorDevice | null> {
 }
 
 /**
+ * Resolve a UDID parameter to an actual device UDID
+ *
+ * This handles the special case where "booted" is passed as a UDID,
+ * which is supported by simctl but NOT by IDB or other tools.
+ *
+ * @param udid - The UDID to resolve (can be "booted", undefined, or an actual UDID)
+ * @returns The resolved UDID or null if no matching device found
+ */
+export async function resolveUdid(udid?: string): Promise<string | null> {
+  // If no UDID provided or "booted" alias is used, resolve to actual booted device
+  if (!udid || udid.toLowerCase() === "booted") {
+    const booted = await getBootedSimulator();
+    return booted?.udid || null;
+  }
+
+  // Otherwise, return the provided UDID as-is
+  return udid;
+}
+
+/**
  * Install an app on a simulator
  */
 export async function installApp(

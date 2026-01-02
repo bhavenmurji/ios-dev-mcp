@@ -6,7 +6,7 @@
  */
 
 import { executeCommand, executeShell } from "../utils/process.js";
-import { getBootedSimulator } from "../simulator/controller.js";
+import { resolveUdid } from "../simulator/controller.js";
 
 export interface UIActionResult {
   success: boolean;
@@ -82,14 +82,8 @@ export async function tap(
   y: number,
   options?: { udid?: string }
 ): Promise<UIActionResult> {
-  // Get the simulator UDID for tools that need it
-  let udid = options?.udid;
-  if (!udid) {
-    const booted = await getBootedSimulator();
-    if (booted) {
-      udid = booted.udid;
-    }
-  }
+  // Resolve UDID - handles "booted" alias and undefined
+  const udid = await resolveUdid(options?.udid);
 
   // Method 1: Try IDB first (most reliable - doesn't need window position)
   // idb ui tap --udid <UDID> -- <x> <y>
@@ -189,14 +183,8 @@ export async function swipe(
   duration: number = 300,
   options?: { udid?: string }
 ): Promise<UIActionResult> {
-  // Get the simulator UDID for tools that need it
-  let udid = options?.udid;
-  if (!udid) {
-    const booted = await getBootedSimulator();
-    if (booted) {
-      udid = booted.udid;
-    }
-  }
+  // Resolve UDID - handles "booted" alias and undefined
+  const udid = await resolveUdid(options?.udid);
 
   // Convert duration from ms to seconds for IDB/AXe
   const durationSec = duration / 1000;
@@ -306,14 +294,8 @@ export async function typeText(
   text: string,
   options?: { udid?: string }
 ): Promise<UIActionResult> {
-  // Get the simulator UDID for tools that need it
-  let udid = options?.udid;
-  if (!udid) {
-    const booted = await getBootedSimulator();
-    if (booted) {
-      udid = booted.udid;
-    }
-  }
+  // Resolve UDID - handles "booted" alias and undefined
+  const udid = await resolveUdid(options?.udid);
 
   // Method 1: Try IDB first
   // idb ui text --udid <UDID> "<text>"
@@ -477,17 +459,14 @@ export async function pressButton(
   button: "home" | "lock" | "volume_up" | "volume_down" | "shake",
   options?: { udid?: string }
 ): Promise<UIActionResult> {
-  let udid = options?.udid;
+  // Resolve UDID - handles "booted" alias and undefined
+  const udid = await resolveUdid(options?.udid);
   if (!udid) {
-    const booted = await getBootedSimulator();
-    if (!booted) {
-      return {
-        success: false,
-        message: "",
-        error: "No booted simulator found",
-      };
-    }
-    udid = booted.udid;
+    return {
+      success: false,
+      message: "",
+      error: "No booted simulator found",
+    };
   }
 
   let args: string[];
@@ -587,16 +566,13 @@ export async function captureScreen(
   outputPath?: string,
   options?: { udid?: string }
 ): Promise<{ success: boolean; path?: string; error?: string }> {
-  let udid = options?.udid;
+  // Resolve UDID - handles "booted" alias and undefined
+  const udid = await resolveUdid(options?.udid);
   if (!udid) {
-    const booted = await getBootedSimulator();
-    if (!booted) {
-      return {
-        success: false,
-        error: "No booted simulator found",
-      };
-    }
-    udid = booted.udid;
+    return {
+      success: false,
+      error: "No booted simulator found",
+    };
   }
 
   const { takeScreenshot } = await import("../simulator/controller.js");
@@ -719,17 +695,14 @@ export async function setAppearance(
   mode: "light" | "dark",
   options?: { udid?: string }
 ): Promise<UIActionResult> {
-  let udid = options?.udid;
+  // Resolve UDID - handles "booted" alias and undefined
+  const udid = await resolveUdid(options?.udid);
   if (!udid) {
-    const booted = await getBootedSimulator();
-    if (!booted) {
-      return {
-        success: false,
-        message: "",
-        error: "No booted simulator found",
-      };
-    }
-    udid = booted.udid;
+    return {
+      success: false,
+      message: "",
+      error: "No booted simulator found",
+    };
   }
 
   const result = await executeCommand(
