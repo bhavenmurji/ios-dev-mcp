@@ -70,16 +70,59 @@ async function getSimulatorWindowBounds(): Promise<{
 
 /**
  * Tap at specific coordinates on the simulator screen
+ * Uses simctl io command which works directly with device coordinates
  */
 export async function tap(
   x: number,
   y: number,
   options?: { udid?: string }
 ): Promise<UIActionResult> {
+  // Get the booted simulator UDID
+  let udid = options?.udid;
+  if (!udid) {
+    const booted = await getBootedSimulator();
+    if (!booted) {
+      return {
+        success: false,
+        message: "",
+        error: "No booted simulator found. Please boot a simulator first.",
+      };
+    }
+    udid = booted.udid;
+  }
+
+  // Use simctl io tap command - works directly with device coordinates
+  const result = await executeCommand(
+    "xcrun",
+    ["simctl", "io", udid, "tap", String(x), String(y)],
+    { timeout: 5000 }
+  );
+
+  if (result.exitCode !== 0) {
+    // Fallback to AppleScript-based approach if simctl io fails
+    const fallbackResult = await tapViaAppleScript(x, y);
+    if (!fallbackResult.success) {
+      return {
+        success: false,
+        message: "",
+        error: `Failed to tap at (${x}, ${y}): ${result.stderr || fallbackResult.error}`,
+      };
+    }
+    return fallbackResult;
+  }
+
+  return {
+    success: true,
+    message: `Tapped at (${x}, ${y})`,
+  };
+}
+
+/**
+ * Fallback tap implementation using AppleScript (requires window position)
+ */
+async function tapViaAppleScript(x: number, y: number): Promise<UIActionResult> {
   // Ensure simulator is focused
   await focusSimulator();
-
-  // Small delay to ensure focus
   await new Promise(resolve => setTimeout(resolve, 200));
 
   // Get window position to calculate absolute screen coordinates
@@ -88,12 +131,11 @@ export async function tap(
     return {
       success: false,
       message: "",
-      error: "Could not get Simulator window position. Ensure Simulator is open.",
+      error: "Could not get Simulator window position. Ensure Simulator is open and visible.",
     };
   }
 
   // Calculate absolute screen position
-  // Add offset for the window title bar (approximately 28 pixels on macOS)
   const titleBarHeight = 28;
   const absX = windowBounds.x + x;
   const absY = windowBounds.y + titleBarHeight + y;
@@ -115,7 +157,7 @@ export async function tap(
       return {
         success: false,
         message: "",
-        error: `Failed to tap at (${x}, ${y}): ${result.stderr || cliclickResult.stderr}`,
+        error: `AppleScript and cliclick both failed: ${result.stderr || cliclickResult.stderr}`,
       };
     }
   }
@@ -128,6 +170,7 @@ export async function tap(
 
 /**
  * Swipe from one point to another
+ * Uses simctl io command which works directly with device coordinates
  */
 export async function swipe(
   from: Point,
@@ -135,6 +178,51 @@ export async function swipe(
   duration: number = 300,
   options?: { udid?: string }
 ): Promise<UIActionResult> {
+  // Get the booted simulator UDID
+  let udid = options?.udid;
+  if (!udid) {
+    const booted = await getBootedSimulator();
+    if (!booted) {
+      return {
+        success: false,
+        message: "",
+        error: "No booted simulator found. Please boot a simulator first.",
+      };
+    }
+    udid = booted.udid;
+  }
+
+  // Use simctl io swipe command - works directly with device coordinates
+  // Note: simctl io swipe doesn't support duration, but provides reliable swipe
+  const result = await executeCommand(
+    "xcrun",
+    ["simctl", "io", udid, "swipe", String(from.x), String(from.y), String(to.x), String(to.y)],
+    { timeout: 5000 }
+  );
+
+  if (result.exitCode !== 0) {
+    // Fallback to AppleScript/cliclick approach
+    const fallbackResult = await swipeViaAppleScript(from, to);
+    if (!fallbackResult.success) {
+      return {
+        success: false,
+        message: "",
+        error: `Failed to swipe: ${result.stderr || fallbackResult.error}`,
+      };
+    }
+    return fallbackResult;
+  }
+
+  return {
+    success: true,
+    message: `Swiped from (${from.x}, ${from.y}) to (${to.x}, ${to.y})`,
+  };
+}
+
+/**
+ * Fallback swipe implementation using AppleScript/cliclick
+ */
+async function swipeViaAppleScript(from: Point, to: Point): Promise<UIActionResult> {
   await focusSimulator();
   await new Promise(resolve => setTimeout(resolve, 200));
 
@@ -144,7 +232,7 @@ export async function swipe(
     return {
       success: false,
       message: "",
-      error: "Could not get Simulator window position. Ensure Simulator is open.",
+      error: "Could not get Simulator window position. Ensure Simulator is open and visible.",
     };
   }
 
@@ -461,6 +549,7 @@ export async function wait(milliseconds: number): Promise<UIActionResult> {
 
 /**
  * Perform a long press at coordinates
+ * Note: simctl io doesn't support long press directly, so we try cliclick first
  */
 export async function longPress(
   x: number,
@@ -468,83 +557,71 @@ export async function longPress(
   duration: number = 1000,
   options?: { udid?: string }
 ): Promise<UIActionResult> {
+  // First try cliclick with window bounds (best long press support)
   await focusSimulator();
   await new Promise(resolve => setTimeout(resolve, 200));
 
-  // Get window position to calculate absolute screen coordinates
   const windowBounds = await getSimulatorWindowBounds();
-  if (!windowBounds) {
-    return {
-      success: false,
-      message: "",
-      error: "Could not get Simulator window position. Ensure Simulator is open.",
-    };
+  if (windowBounds) {
+    const titleBarHeight = 28;
+    const absX = windowBounds.x + x;
+    const absY = windowBounds.y + titleBarHeight + y;
+
+    // Use cliclick for long press if available
+    const result = await executeCommand(
+      "cliclick",
+      [`kd:${absX},${absY}`, `w:${duration}`, `ku:${absX},${absY}`],
+      { timeout: duration + 5000 }
+    );
+
+    if (result.exitCode === 0) {
+      return {
+        success: true,
+        message: `Long pressed at (${x}, ${y}) for ${duration}ms`,
+      };
+    }
   }
 
-  // Calculate absolute screen position
-  const titleBarHeight = 28;
-  const absX = windowBounds.x + x;
-  const absY = windowBounds.y + titleBarHeight + y;
-
-  // Use cliclick for long press if available
-  const result = await executeCommand(
-    "cliclick",
-    [`kd:${absX},${absY}`, `w:${duration}`, `ku:${absX},${absY}`],
-    { timeout: duration + 5000 }
-  );
-
-  if (result.exitCode === 0) {
-    return {
-      success: true,
-      message: `Long pressed at (${x}, ${y}) for ${duration}ms`,
-    };
-  }
-
-  // Fallback: just do a regular tap
+  // Fallback: just do a regular tap using simctl io
+  // (simctl io doesn't support long press duration)
   return tap(x, y, options);
 }
 
 /**
  * Double tap at coordinates
+ * Uses two quick simctl io taps, with cliclick fallback for better precision
  */
 export async function doubleTap(
   x: number,
   y: number,
   options?: { udid?: string }
 ): Promise<UIActionResult> {
+  // First try cliclick with window bounds (best double-click support)
   await focusSimulator();
   await new Promise(resolve => setTimeout(resolve, 200));
 
-  // Get window position to calculate absolute screen coordinates
   const windowBounds = await getSimulatorWindowBounds();
-  if (!windowBounds) {
-    return {
-      success: false,
-      message: "",
-      error: "Could not get Simulator window position. Ensure Simulator is open.",
-    };
+  if (windowBounds) {
+    const titleBarHeight = 28;
+    const absX = windowBounds.x + x;
+    const absY = windowBounds.y + titleBarHeight + y;
+
+    // Use cliclick for double click if available
+    const result = await executeCommand(
+      "cliclick",
+      [`dc:${absX},${absY}`],
+      { timeout: 5000 }
+    );
+
+    if (result.exitCode === 0) {
+      return {
+        success: true,
+        message: `Double tapped at (${x}, ${y})`,
+      };
+    }
   }
 
-  // Calculate absolute screen position
-  const titleBarHeight = 28;
-  const absX = windowBounds.x + x;
-  const absY = windowBounds.y + titleBarHeight + y;
-
-  // Use cliclick for double click if available
-  const result = await executeCommand(
-    "cliclick",
-    [`dc:${absX},${absY}`],
-    { timeout: 5000 }
-  );
-
-  if (result.exitCode === 0) {
-    return {
-      success: true,
-      message: `Double tapped at (${x}, ${y})`,
-    };
-  }
-
-  // Fallback: two quick taps
+  // Fallback: two quick taps using simctl io
   await tap(x, y, options);
   await new Promise(resolve => setTimeout(resolve, 100));
   await tap(x, y, options);
@@ -619,18 +696,26 @@ export async function checkUIAutomationAvailable(): Promise<{
   const capabilities: string[] = [];
   const missing: string[] = [];
 
-  // Check AppleScript
+  // Check simctl io (primary method for tap/swipe)
+  const simctlResult = await executeCommand("xcrun", ["simctl", "help", "io"], { timeout: 2000 });
+  if (simctlResult.exitCode === 0) {
+    capabilities.push("simctl io (tap, swipe - primary method)");
+  } else {
+    missing.push("simctl io (requires Xcode command line tools)");
+  }
+
+  // Check AppleScript (fallback for clicks, required for keystrokes)
   const osascriptResult = await executeCommand("which", ["osascript"], { timeout: 2000 });
   if (osascriptResult.exitCode === 0) {
-    capabilities.push("AppleScript (keystroke, basic clicks)");
+    capabilities.push("AppleScript (keystroke, fallback clicks)");
   } else {
     missing.push("osascript");
   }
 
-  // Check cliclick (optional but enhances capabilities)
+  // Check cliclick (optional but enhances capabilities for long press, double-click)
   const cliclickResult = await executeCommand("which", ["cliclick"], { timeout: 2000 });
   if (cliclickResult.exitCode === 0) {
-    capabilities.push("cliclick (precise clicks, swipes, long press)");
+    capabilities.push("cliclick (precise clicks, long press, double-click)");
   } else {
     missing.push("cliclick (optional - install with 'brew install cliclick')");
   }
@@ -647,8 +732,12 @@ export async function checkUIAutomationAvailable(): Promise<{
     missing.push("Simulator.app (not running)");
   }
 
+  // simctl io is the primary method now, so we're available if that works
+  const hasSimctlIo = simctlResult.exitCode === 0;
+  const hasAppleScript = osascriptResult.exitCode === 0;
+
   return {
-    available: capabilities.length >= 2,
+    available: hasSimctlIo || hasAppleScript,
     capabilities,
     missing,
   };
