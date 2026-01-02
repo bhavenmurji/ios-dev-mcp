@@ -70,57 +70,13 @@ async function getSimulatorWindowBounds(): Promise<{
 
 /**
  * Tap at specific coordinates on the simulator screen
- * Uses simctl io command which works directly with device coordinates
+ * Uses AppleScript/cliclick to send input to the Simulator window
  */
 export async function tap(
   x: number,
   y: number,
   options?: { udid?: string }
 ): Promise<UIActionResult> {
-  // Get the booted simulator UDID
-  let udid = options?.udid;
-  if (!udid) {
-    const booted = await getBootedSimulator();
-    if (!booted) {
-      return {
-        success: false,
-        message: "",
-        error: "No booted simulator found. Please boot a simulator first.",
-      };
-    }
-    udid = booted.udid;
-  }
-
-  // Use simctl io tap command - works directly with device coordinates
-  const result = await executeCommand(
-    "xcrun",
-    ["simctl", "io", udid, "tap", String(x), String(y)],
-    { timeout: 5000 }
-  );
-
-  if (result.exitCode !== 0) {
-    // Fallback to AppleScript-based approach if simctl io fails
-    const fallbackResult = await tapViaAppleScript(x, y);
-    if (!fallbackResult.success) {
-      return {
-        success: false,
-        message: "",
-        error: `Failed to tap at (${x}, ${y}): ${result.stderr || fallbackResult.error}`,
-      };
-    }
-    return fallbackResult;
-  }
-
-  return {
-    success: true,
-    message: `Tapped at (${x}, ${y})`,
-  };
-}
-
-/**
- * Fallback tap implementation using AppleScript (requires window position)
- */
-async function tapViaAppleScript(x: number, y: number): Promise<UIActionResult> {
   // Ensure simulator is focused
   await focusSimulator();
   await new Promise(resolve => setTimeout(resolve, 200));
@@ -140,7 +96,17 @@ async function tapViaAppleScript(x: number, y: number): Promise<UIActionResult> 
   const absX = windowBounds.x + x;
   const absY = windowBounds.y + titleBarHeight + y;
 
-  // Use AppleScript to click at absolute screen coordinates
+  // Try cliclick first if available (more reliable)
+  const cliclickResult = await executeCommand("cliclick", [`c:${absX},${absY}`], { timeout: 5000 });
+
+  if (cliclickResult.exitCode === 0) {
+    return {
+      success: true,
+      message: `Tapped at (${x}, ${y})`,
+    };
+  }
+
+  // Fallback to AppleScript
   const script = `
     tell application "System Events"
       click at {${absX}, ${absY}}
@@ -150,16 +116,11 @@ async function tapViaAppleScript(x: number, y: number): Promise<UIActionResult> 
   const result = await executeCommand("osascript", ["-e", script], { timeout: 5000 });
 
   if (result.exitCode !== 0) {
-    // Fallback: try using cliclick if available (common macOS utility)
-    const cliclickResult = await executeCommand("cliclick", [`c:${absX},${absY}`], { timeout: 5000 });
-
-    if (cliclickResult.exitCode !== 0) {
-      return {
-        success: false,
-        message: "",
-        error: `AppleScript and cliclick both failed: ${result.stderr || cliclickResult.stderr}`,
-      };
-    }
+    return {
+      success: false,
+      message: "",
+      error: `Failed to tap at (${x}, ${y}): ${result.stderr}. Consider installing cliclick: brew install cliclick`,
+    };
   }
 
   return {
@@ -170,7 +131,7 @@ async function tapViaAppleScript(x: number, y: number): Promise<UIActionResult> 
 
 /**
  * Swipe from one point to another
- * Uses simctl io command which works directly with device coordinates
+ * Uses cliclick for drag operations, with keyboard fallback
  */
 export async function swipe(
   from: Point,
@@ -178,51 +139,6 @@ export async function swipe(
   duration: number = 300,
   options?: { udid?: string }
 ): Promise<UIActionResult> {
-  // Get the booted simulator UDID
-  let udid = options?.udid;
-  if (!udid) {
-    const booted = await getBootedSimulator();
-    if (!booted) {
-      return {
-        success: false,
-        message: "",
-        error: "No booted simulator found. Please boot a simulator first.",
-      };
-    }
-    udid = booted.udid;
-  }
-
-  // Use simctl io swipe command - works directly with device coordinates
-  // Note: simctl io swipe doesn't support duration, but provides reliable swipe
-  const result = await executeCommand(
-    "xcrun",
-    ["simctl", "io", udid, "swipe", String(from.x), String(from.y), String(to.x), String(to.y)],
-    { timeout: 5000 }
-  );
-
-  if (result.exitCode !== 0) {
-    // Fallback to AppleScript/cliclick approach
-    const fallbackResult = await swipeViaAppleScript(from, to);
-    if (!fallbackResult.success) {
-      return {
-        success: false,
-        message: "",
-        error: `Failed to swipe: ${result.stderr || fallbackResult.error}`,
-      };
-    }
-    return fallbackResult;
-  }
-
-  return {
-    success: true,
-    message: `Swiped from (${from.x}, ${from.y}) to (${to.x}, ${to.y})`,
-  };
-}
-
-/**
- * Fallback swipe implementation using AppleScript/cliclick
- */
-async function swipeViaAppleScript(from: Point, to: Point): Promise<UIActionResult> {
   await focusSimulator();
   await new Promise(resolve => setTimeout(resolve, 200));
 
@@ -243,7 +159,7 @@ async function swipeViaAppleScript(from: Point, to: Point): Promise<UIActionResu
   const absToX = windowBounds.x + to.x;
   const absToY = windowBounds.y + titleBarHeight + to.y;
 
-  // For actual swipe, we use cliclick if available
+  // Use cliclick for drag if available (best swipe support)
   const cliclickResult = await executeCommand(
     "cliclick",
     [`dd:${absFromX},${absFromY}`, `du:${absToX},${absToY}`],
@@ -270,7 +186,7 @@ async function swipeViaAppleScript(from: Point, to: Point): Promise<UIActionResu
 
   return {
     success: true,
-    message: `Swipe gesture simulated (${direction})`,
+    message: `Swipe gesture simulated (${direction}). For precise swipes, install cliclick: brew install cliclick`,
   };
 }
 
@@ -696,12 +612,12 @@ export async function checkUIAutomationAvailable(): Promise<{
   const capabilities: string[] = [];
   const missing: string[] = [];
 
-  // Check simctl io (primary method for tap/swipe)
-  const simctlResult = await executeCommand("xcrun", ["simctl", "help", "io"], { timeout: 2000 });
-  if (simctlResult.exitCode === 0) {
-    capabilities.push("simctl io (tap, swipe - primary method)");
+  // Check cliclick (preferred method for tap/swipe/long press)
+  const cliclickResult = await executeCommand("which", ["cliclick"], { timeout: 2000 });
+  if (cliclickResult.exitCode === 0) {
+    capabilities.push("cliclick (tap, swipe, long press, double-click - preferred)");
   } else {
-    missing.push("simctl io (requires Xcode command line tools)");
+    missing.push("cliclick (recommended - install with 'brew install cliclick')");
   }
 
   // Check AppleScript (fallback for clicks, required for keystrokes)
@@ -710,14 +626,6 @@ export async function checkUIAutomationAvailable(): Promise<{
     capabilities.push("AppleScript (keystroke, fallback clicks)");
   } else {
     missing.push("osascript");
-  }
-
-  // Check cliclick (optional but enhances capabilities for long press, double-click)
-  const cliclickResult = await executeCommand("which", ["cliclick"], { timeout: 2000 });
-  if (cliclickResult.exitCode === 0) {
-    capabilities.push("cliclick (precise clicks, long press, double-click)");
-  } else {
-    missing.push("cliclick (optional - install with 'brew install cliclick')");
   }
 
   // Check if Simulator is running
@@ -732,12 +640,12 @@ export async function checkUIAutomationAvailable(): Promise<{
     missing.push("Simulator.app (not running)");
   }
 
-  // simctl io is the primary method now, so we're available if that works
-  const hasSimctlIo = simctlResult.exitCode === 0;
+  // Available if we have cliclick or AppleScript for input
+  const hasCliclick = cliclickResult.exitCode === 0;
   const hasAppleScript = osascriptResult.exitCode === 0;
 
   return {
-    available: hasSimctlIo || hasAppleScript,
+    available: hasCliclick || hasAppleScript,
     capabilities,
     missing,
   };

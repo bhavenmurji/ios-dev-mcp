@@ -91,6 +91,26 @@ import {
   describeScreen,
 } from "./ui/accessibility.js";
 
+// Import integrated automation tools
+import {
+  analyzeScreen,
+  findAndTap,
+  findAndType,
+  tapAtCoordinates,
+  swipeGesture,
+  startRecording as startUIRecording,
+  stopRecording as stopUIRecording,
+  generateXCUITest,
+  runAutomatedFlow,
+  getAutomationStatus,
+} from "./ui/integrated-automation.js";
+
+import {
+  checkWDAStatus,
+  startWDA,
+  stopWDA,
+} from "./ui/webdriver-agent.js";
+
 // Import error fixer and diagnostics
 import {
   parseBuildErrors,
@@ -1190,6 +1210,206 @@ const TOOLS: Tool[] = [
       required: ["url"],
     },
   },
+
+  // ==========================================
+  // INTEGRATED UI AUTOMATION
+  // ==========================================
+
+  {
+    name: "ui_automation_status",
+    description:
+      "Check the status of UI automation systems (WebDriverAgent, cliclick, AppleScript). Shows what methods are available for reliable UI testing.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
+  {
+    name: "ui_automation_start",
+    description:
+      "Start WebDriverAgent for reliable UI automation. WDA provides accurate element discovery and interaction. Falls back to AppleScript/cliclick if WDA unavailable.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        bundleId: {
+          type: "string",
+          description: "Bundle ID of the app to automate (optional)",
+        },
+        port: {
+          type: "number",
+          description: "WDA port (default: 8100)",
+        },
+      },
+    },
+  },
+  {
+    name: "ui_analyze_screen",
+    description:
+      "Analyze the current screen - takes screenshot and discovers all UI elements with their coordinates. Essential for understanding what can be interacted with.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        includeScreenshot: {
+          type: "boolean",
+          description: "Include screenshot path in result (default: true)",
+        },
+      },
+    },
+  },
+  {
+    name: "ui_find_and_tap",
+    description:
+      "Find a UI element by label/type/text and tap it. More reliable than coordinate-based tapping. Uses WDA if available, falls back to cliclick/AppleScript.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        label: {
+          type: "string",
+          description: "Element label to find",
+        },
+        type: {
+          type: "string",
+          description: "Element type (button, textField, cell, etc.)",
+        },
+        containsText: {
+          type: "string",
+          description: "Text the element should contain",
+        },
+        index: {
+          type: "number",
+          description: "Index if multiple matches (default: 0)",
+        },
+      },
+    },
+  },
+  {
+    name: "ui_find_and_type",
+    description:
+      "Find a text field and type into it. Automatically taps to focus first.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        text: {
+          type: "string",
+          description: "Text to type",
+        },
+        label: {
+          type: "string",
+          description: "Text field label",
+        },
+        placeholder: {
+          type: "string",
+          description: "Text field placeholder text",
+        },
+        index: {
+          type: "number",
+          description: "Index if multiple matches (default: 0)",
+        },
+      },
+      required: ["text"],
+    },
+  },
+  {
+    name: "ui_run_flow",
+    description:
+      "Run an automated UI test flow - a sequence of taps, types, swipes, and waits. Optionally generates XCUITest code for the flow.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        actions: {
+          type: "array",
+          description: "Array of actions to perform",
+          items: {
+            type: "object",
+            properties: {
+              action: {
+                type: "string",
+                enum: ["tap", "type", "swipe", "wait", "screenshot"],
+              },
+              target: {
+                type: "object",
+                description: "Element to interact with (for tap/type)",
+                properties: {
+                  label: { type: "string" },
+                  type: { type: "string" },
+                  containsText: { type: "string" },
+                  index: { type: "number" },
+                },
+              },
+              text: {
+                type: "string",
+                description: "Text to type (for type action)",
+              },
+              coordinates: {
+                type: "object",
+                description: "Coordinates for tap (if no target)",
+                properties: {
+                  x: { type: "number" },
+                  y: { type: "number" },
+                },
+              },
+              swipe: {
+                type: "object",
+                description: "Swipe configuration",
+                properties: {
+                  direction: {
+                    type: "string",
+                    enum: ["up", "down", "left", "right"],
+                  },
+                  distance: { type: "number" },
+                },
+              },
+              duration: {
+                type: "number",
+                description: "Duration in ms (for wait/swipe)",
+              },
+            },
+          },
+        },
+        generateTest: {
+          type: "boolean",
+          description: "Generate XCUITest code from the flow (default: false)",
+        },
+        bundleId: {
+          type: "string",
+          description: "App bundle ID for test generation",
+        },
+      },
+      required: ["actions"],
+    },
+  },
+  {
+    name: "ui_record_start",
+    description:
+      "Start recording UI actions for XCUITest code generation. After recording, use ui_record_stop to get the generated test code.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        bundleId: {
+          type: "string",
+          description: "Bundle ID of the app being tested",
+        },
+      },
+    },
+  },
+  {
+    name: "ui_record_stop",
+    description:
+      "Stop recording UI actions and generate XCUITest Swift code. Returns test code that can be added to your test target.",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        testName: {
+          type: "string",
+          description: "Name for the generated test method (default: testRecordedFlow)",
+        },
+        className: {
+          type: "string",
+          description: "Name for the test class (default: RecordedUITests)",
+        },
+      },
+    },
+  },
 ];
 
 /**
@@ -1328,6 +1548,24 @@ class IOSDevServer {
         return await this.handleUIDismissKeyboard();
       case "ui_set_appearance":
         return await this.handleUISetAppearance(args);
+
+      // Integrated UI Automation tools
+      case "ui_automation_status":
+        return await this.handleUIAutomationStatus();
+      case "ui_automation_start":
+        return await this.handleUIAutomationStart(args);
+      case "ui_analyze_screen":
+        return await this.handleUIAnalyzeScreen(args);
+      case "ui_find_and_tap":
+        return await this.handleUIFindAndTap(args);
+      case "ui_find_and_type":
+        return await this.handleUIFindAndType(args);
+      case "ui_run_flow":
+        return await this.handleUIRunFlow(args);
+      case "ui_record_start":
+        return await this.handleUIRecordStart(args);
+      case "ui_record_stop":
+        return await this.handleUIRecordStop(args);
 
       // Testing tools
       case "xcode_test":
@@ -2408,6 +2646,297 @@ class IOSDevServer {
     return {
       content: [{ type: "text", text: result.success ? result.message : `Failed: ${result.error}` }],
       isError: !result.success,
+    };
+  }
+
+  // ==========================================
+  // INTEGRATED UI AUTOMATION HANDLERS
+  // ==========================================
+
+  private async handleUIAutomationStatus() {
+    const status = await getAutomationStatus();
+
+    const lines: string[] = [
+      "# UI Automation Status",
+      "",
+      "## WebDriverAgent",
+      `- Installed: ${status.wda.installed ? "✅" : "❌"}`,
+      `- Running: ${status.wda.running ? "✅" : "❌"}`,
+    ];
+
+    if (status.wda.port) {
+      lines.push(`- Port: ${status.wda.port}`);
+    }
+
+    lines.push("");
+    lines.push("## Fallback Methods");
+    lines.push(`- cliclick: ${status.fallback.cliclick ? "✅ Available" : "❌ Not installed (brew install cliclick)"}`);
+    lines.push(`- AppleScript: ${status.fallback.applescript ? "✅ Available" : "❌ Not available"}`);
+    lines.push("");
+    lines.push(`## Recording: ${status.recording ? "🔴 Active" : "⏹️ Stopped"}`);
+    lines.push("");
+    lines.push(`## Recommended Method: ${status.recommendedMethod}`);
+
+    if (!status.wda.installed) {
+      lines.push("");
+      lines.push("## Setup WebDriverAgent (optional but recommended):");
+      lines.push("```bash");
+      lines.push("npm install -g appium");
+      lines.push("appium driver install xcuitest");
+      lines.push("```");
+    }
+
+    return {
+      content: [{ type: "text", text: lines.join("\n") }],
+    };
+  }
+
+  private async handleUIAutomationStart(args: Record<string, unknown>) {
+    const bundleId = args.bundleId as string | undefined;
+    const port = args.port as number | undefined;
+
+    const result = await startWDA({ bundleId, port });
+
+    if (result.success) {
+      return {
+        content: [{
+          type: "text",
+          text: `WebDriverAgent started successfully!\n` +
+            `Port: ${result.session?.port}\n` +
+            `Session: ${result.session?.sessionId}\n\n` +
+            `You can now use ui_analyze_screen, ui_find_and_tap, etc. for reliable automation.`
+        }],
+      };
+    }
+
+    return {
+      content: [{
+        type: "text",
+        text: `Failed to start WDA: ${result.error}\n\n` +
+          `Falling back to cliclick/AppleScript methods. These still work but are less reliable.\n` +
+          `To install WDA: npm install -g appium && appium driver install xcuitest`
+      }],
+      isError: true,
+    };
+  }
+
+  private async handleUIAnalyzeScreen(args: Record<string, unknown>) {
+    const includeScreenshot = (args.includeScreenshot as boolean) !== false;
+
+    const analysis = await analyzeScreen({ includeScreenshot });
+
+    if (!analysis.success) {
+      return {
+        content: [{ type: "text", text: `Failed to analyze screen: ${analysis.error}` }],
+        isError: true,
+      };
+    }
+
+    const lines: string[] = [
+      `# Screen Analysis (via ${analysis.method})`,
+      "",
+    ];
+
+    if (analysis.screenshotPath) {
+      lines.push(`Screenshot: ${analysis.screenshotPath}`);
+      lines.push("");
+    }
+
+    lines.push(`## Summary`);
+    lines.push(`- Total elements: ${analysis.elements.length}`);
+    lines.push(`- Interactive elements: ${analysis.interactiveElements.length}`);
+    lines.push(`- Buttons: ${analysis.buttons.length}`);
+    lines.push(`- Text fields: ${analysis.textFields.length}`);
+    lines.push("");
+
+    if (analysis.buttons.length > 0) {
+      lines.push("## Buttons");
+      for (const btn of analysis.buttons.slice(0, 10)) {
+        lines.push(`- "${btn.label || btn.value || "Unlabeled"}" at (${Math.round(btn.centerX)}, ${Math.round(btn.centerY)})`);
+      }
+      if (analysis.buttons.length > 10) {
+        lines.push(`  ... and ${analysis.buttons.length - 10} more`);
+      }
+      lines.push("");
+    }
+
+    if (analysis.textFields.length > 0) {
+      lines.push("## Text Fields");
+      for (const field of analysis.textFields.slice(0, 10)) {
+        lines.push(`- "${field.label || field.value || "Unlabeled"}" at (${Math.round(field.centerX)}, ${Math.round(field.centerY)})`);
+      }
+      lines.push("");
+    }
+
+    if (analysis.interactiveElements.length > 0) {
+      lines.push("## Other Interactive Elements");
+      const others = analysis.interactiveElements.filter(
+        e => !analysis.buttons.includes(e) && !analysis.textFields.includes(e)
+      ).slice(0, 10);
+      for (const el of others) {
+        lines.push(`- [${el.type}] "${el.label || el.value || "Unlabeled"}" at (${Math.round(el.centerX)}, ${Math.round(el.centerY)})`);
+      }
+    }
+
+    return {
+      content: [{ type: "text", text: lines.join("\n") }],
+    };
+  }
+
+  private async handleUIFindAndTap(args: Record<string, unknown>) {
+    const query = {
+      label: args.label as string | undefined,
+      type: args.type as string | undefined,
+      containsText: args.containsText as string | undefined,
+      index: args.index as number | undefined,
+    };
+
+    const result = await findAndTap(query);
+
+    if (result.success && result.element) {
+      return {
+        content: [{
+          type: "text",
+          text: `Tapped "${result.element.label || result.element.type}" at (${Math.round(result.element.centerX)}, ${Math.round(result.element.centerY)})`
+        }],
+      };
+    }
+
+    return {
+      content: [{ type: "text", text: `Failed to tap: ${result.error}` }],
+      isError: true,
+    };
+  }
+
+  private async handleUIFindAndType(args: Record<string, unknown>) {
+    const text = args.text as string;
+    const query = {
+      label: args.label as string | undefined,
+      placeholder: args.placeholder as string | undefined,
+      index: args.index as number | undefined,
+    };
+
+    const result = await findAndType(query, text);
+
+    if (result.success) {
+      return {
+        content: [{
+          type: "text",
+          text: `Typed "${text.length > 30 ? text.substring(0, 30) + "..." : text}" into ${result.element?.label || "text field"}`
+        }],
+      };
+    }
+
+    return {
+      content: [{ type: "text", text: `Failed to type: ${result.error}` }],
+      isError: true,
+    };
+  }
+
+  private async handleUIRunFlow(args: Record<string, unknown>) {
+    const actions = args.actions as Array<{
+      action: "tap" | "type" | "swipe" | "wait" | "screenshot";
+      target?: { label?: string; type?: string; containsText?: string; index?: number };
+      text?: string;
+      coordinates?: { x: number; y: number };
+      swipe?: { direction: "up" | "down" | "left" | "right"; distance?: number };
+      duration?: number;
+    }>;
+    const generateTest = (args.generateTest as boolean) || false;
+    const bundleId = args.bundleId as string | undefined;
+
+    const result = await runAutomatedFlow(actions, {
+      recordForTest: generateTest,
+      bundleId,
+    });
+
+    const lines: string[] = [
+      `# Automation Flow Results`,
+      "",
+      `Overall: ${result.success ? "✅ Success" : "❌ Failed"}`,
+      "",
+      "## Actions:",
+    ];
+
+    for (const r of result.results) {
+      lines.push(`- ${r.action}: ${r.success ? "✅" : "❌"} ${r.error || ""}`);
+    }
+
+    if (result.testCode) {
+      lines.push("");
+      lines.push("## Generated XCUITest Code:");
+      lines.push("```swift");
+      lines.push(result.testCode);
+      lines.push("```");
+    }
+
+    return {
+      content: [{ type: "text", text: lines.join("\n") }],
+      isError: !result.success,
+    };
+  }
+
+  private async handleUIRecordStart(args: Record<string, unknown>) {
+    const bundleId = args.bundleId as string | undefined;
+
+    startUIRecording(bundleId);
+
+    return {
+      content: [{
+        type: "text",
+        text: `🔴 Recording started${bundleId ? ` for ${bundleId}` : ""}.\n\n` +
+          `Now perform UI interactions using:\n` +
+          `- ui_find_and_tap\n` +
+          `- ui_find_and_type\n` +
+          `- ui_tap / ui_swipe / ui_type\n\n` +
+          `When done, use ui_record_stop to generate XCUITest code.`
+      }],
+    };
+  }
+
+  private async handleUIRecordStop(args: Record<string, unknown>) {
+    const testName = (args.testName as string) || "testRecordedFlow";
+    const className = (args.className as string) || "RecordedUITests";
+
+    const session = stopUIRecording();
+
+    if (!session) {
+      return {
+        content: [{ type: "text", text: "No recording session was active." }],
+        isError: true,
+      };
+    }
+
+    if (session.recordedActions.length === 0) {
+      return {
+        content: [{
+          type: "text",
+          text: "Recording stopped but no actions were recorded.\n\n" +
+            "Make sure to use ui_find_and_tap, ui_find_and_type, etc. while recording."
+        }],
+      };
+    }
+
+    const testCode = generateXCUITest(session, { testName, className });
+
+    const lines: string[] = [
+      `⏹️ Recording stopped. ${session.recordedActions.length} actions recorded.`,
+      "",
+      "## Generated XCUITest Code",
+      "",
+      "Add this to your test target:",
+      "",
+      "```swift",
+      testCode,
+      "```",
+      "",
+      "## To use this test:",
+      "1. Add the code to a new file in your UITests target",
+      "2. Run with: xcode_test with onlyTesting: ['YourUITests/RecordedUITests/testRecordedFlow']",
+    ];
+
+    return {
+      content: [{ type: "text", text: lines.join("\n") }],
     };
   }
 
