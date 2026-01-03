@@ -697,13 +697,13 @@ const TOOLS: Tool[] = [
   {
     name: "ui_press_button",
     description:
-      "Press a hardware button on the simulator (home, lock, volume, shake).",
+      "Press a hardware button on the simulator (home, lock, volume, shake, siri, apple_pay). Uses IDB when available for most reliable operation.",
     inputSchema: {
       type: "object" as const,
       properties: {
         button: {
           type: "string",
-          enum: ["home", "lock", "volume_up", "volume_down", "shake"],
+          enum: ["home", "lock", "volume_up", "volume_down", "shake", "siri", "apple_pay"],
           description: "Hardware button to press",
         },
       },
@@ -712,7 +712,7 @@ const TOOLS: Tool[] = [
   },
   {
     name: "ui_scroll",
-    description: "Scroll in a direction.",
+    description: "Scroll in a direction. Uses IDB when available for most reliable operation.",
     inputSchema: {
       type: "object" as const,
       properties: {
@@ -724,6 +724,14 @@ const TOOLS: Tool[] = [
         amount: {
           type: "number",
           description: "Amount to scroll in pixels (default: 100)",
+        },
+        x: {
+          type: "number",
+          description: "Starting X coordinate for scroll (default: 200)",
+        },
+        y: {
+          type: "number",
+          description: "Starting Y coordinate for scroll (default: 400)",
         },
       },
       required: ["direction"],
@@ -1218,7 +1226,7 @@ const TOOLS: Tool[] = [
   {
     name: "ui_automation_status",
     description:
-      "Check the status of UI automation systems (WebDriverAgent, cliclick, AppleScript). Shows what methods are available for reliable UI testing.",
+      "Check the status of UI automation systems (IDB, AXe, WebDriverAgent, cliclick, AppleScript). Shows what methods are available for reliable UI testing. IDB is recommended for best reliability.",
     inputSchema: {
       type: "object" as const,
       properties: {},
@@ -2607,7 +2615,7 @@ class IOSDevServer {
   }
 
   private async handleUIPressButton(args: Record<string, unknown>) {
-    const button = args.button as "home" | "lock" | "volume_up" | "volume_down" | "shake";
+    const button = args.button as "home" | "lock" | "volume_up" | "volume_down" | "shake" | "siri" | "apple_pay";
 
     const result = await pressButton(button);
 
@@ -2620,8 +2628,10 @@ class IOSDevServer {
   private async handleUIScroll(args: Record<string, unknown>) {
     const direction = args.direction as "up" | "down" | "left" | "right";
     const amount = (args.amount as number) || 100;
+    const x = args.x as number | undefined;
+    const y = args.y as number | undefined;
 
-    const result = await scroll(direction, amount);
+    const result = await scroll(direction, amount, { x, y });
 
     return {
       content: [{ type: "text", text: result.success ? result.message : `Failed: ${result.error}` }],
@@ -2659,10 +2669,28 @@ class IOSDevServer {
     const lines: string[] = [
       "# UI Automation Status",
       "",
-      "## WebDriverAgent",
-      `- Installed: ${status.wda.installed ? "✅" : "❌"}`,
-      `- Running: ${status.wda.running ? "✅" : "❌"}`,
+      "## IDB (Facebook iOS Development Bridge) - RECOMMENDED",
+      `- Available: ${status.idb.available ? "✅ Installed" : "❌ Not installed"}`,
     ];
+
+    if (!status.idb.available) {
+      lines.push("- Install: `brew install idb-companion && pip install fb-idb`");
+    } else {
+      lines.push("- IDB provides reliable tap/swipe/scroll/type without window focus");
+    }
+
+    lines.push("");
+    lines.push("## AXe (Apple Accessibility APIs)");
+    lines.push(`- Available: ${status.axe.available ? "✅ Installed" : "❌ Not installed"}`);
+
+    if (!status.axe.available && !status.idb.available) {
+      lines.push("- Install: `brew install axe`");
+    }
+
+    lines.push("");
+    lines.push("## WebDriverAgent");
+    lines.push(`- Installed: ${status.wda.installed ? "✅" : "❌"}`);
+    lines.push(`- Running: ${status.wda.running ? "✅" : "❌"}`);
 
     if (status.wda.port) {
       lines.push(`- Port: ${status.wda.port}`);
@@ -2677,10 +2705,14 @@ class IOSDevServer {
     lines.push("");
     lines.push(`## Recommended Method: ${status.recommendedMethod}`);
 
-    if (!status.wda.installed) {
+    if (!status.idb.available && !status.axe.available && !status.wda.installed) {
       lines.push("");
-      lines.push("## Setup WebDriverAgent (optional but recommended):");
+      lines.push("## Setup Recommendations:");
       lines.push("```bash");
+      lines.push("# Option 1: IDB (RECOMMENDED - most reliable)");
+      lines.push("brew install idb-companion && pip install fb-idb");
+      lines.push("");
+      lines.push("# Option 2: WebDriverAgent (for element inspection)");
       lines.push("npm install -g appium");
       lines.push("appium driver install xcuitest");
       lines.push("```");
