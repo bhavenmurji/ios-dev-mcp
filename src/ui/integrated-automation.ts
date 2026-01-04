@@ -16,7 +16,7 @@
 
 import { executeCommand } from "../utils/process.js";
 import { getBootedSimulator, takeScreenshot } from "../simulator/controller.js";
-import { tap, swipe, typeText } from "./automation.js";
+import { tap, swipe, typeText, isIDBAvailable, isAXeAvailable } from "./automation.js";
 import {
   checkWDAStatus,
   startWDA,
@@ -842,11 +842,19 @@ export async function runAutomatedFlow(
  */
 export async function getAutomationStatus(): Promise<{
   wda: { installed: boolean; running: boolean; port?: number };
+  idb: { available: boolean };
+  axe: { available: boolean };
   fallback: { cliclick: boolean; applescript: boolean };
   recording: boolean;
   recommendedMethod: string;
 }> {
   const wdaStatus = await checkWDAStatus();
+
+  // Check IDB (Facebook's iOS Development Bridge) - most reliable for UI automation
+  const hasIDB = await isIDBAvailable();
+
+  // Check AXe (Apple Accessibility APIs tool)
+  const hasAXe = await isAXeAvailable();
 
   // Check cliclick
   const cliclickResult = await executeCommand("which", ["cliclick"], { timeout: 2000 });
@@ -856,8 +864,13 @@ export async function getAutomationStatus(): Promise<{
   const osascriptResult = await executeCommand("which", ["osascript"], { timeout: 2000 });
   const hasApplescript = osascriptResult.exitCode === 0;
 
+  // Determine recommended method (priority: IDB > AXe > WDA > cliclick > AppleScript)
   let recommendedMethod = "fallback";
-  if (wdaStatus.running) {
+  if (hasIDB) {
+    recommendedMethod = "idb (best - works without window focus)";
+  } else if (hasAXe) {
+    recommendedMethod = "axe (good - works without window focus)";
+  } else if (wdaStatus.running) {
     recommendedMethod = "wda";
   } else if (wdaStatus.installed) {
     recommendedMethod = "wda (not running - start with ui_automation_start)";
@@ -872,6 +885,12 @@ export async function getAutomationStatus(): Promise<{
       installed: wdaStatus.installed,
       running: wdaStatus.running,
       port: wdaStatus.port,
+    },
+    idb: {
+      available: hasIDB,
+    },
+    axe: {
+      available: hasAXe,
     },
     fallback: {
       cliclick: hasCliclick,
